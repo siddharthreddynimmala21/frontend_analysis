@@ -23,9 +23,9 @@ export const register = async (email) => {
     console.log('Attempting registration for:', email);
     console.log('API Base URL:', API_BASE_URL);
     
-    const response = await api.post('/api/auth/register', { email });
+  const response = await api.post('/api/auth/register', { email });
     console.log('Registration successful:', response.data);
-    return response.data;
+  return response.data;
   } catch (error) {
     console.error('Registration Error Details:', {
       message: error.message,
@@ -57,9 +57,9 @@ export const login = async (email, password) => {
     console.log('Attempting login for:', email);
     console.log('API Base URL:', API_BASE_URL);
     
-    const response = await api.post('/api/auth/login', { email, password });
+  const response = await api.post('/api/auth/login', { email, password });
     console.log('Login successful:', response.data);
-    return response.data;
+  return response.data;
   } catch (error) {
     console.error('Login Error Details:', {
       message: error.message,
@@ -149,6 +149,74 @@ export const uploadResume = async (formData) => {
     return responseData;
   } catch (error) {
     console.error('Resume Upload Full Error:', error);
+    
+    // More detailed error logging
+    if (error instanceof TypeError) {
+      console.error('Network Error:', error.message);
+    }
+    
+    throw error;
+  }
+};
+
+/**
+ * Upload and analyze resume PDF with AI
+ * Extracts structured information (work experience, education, skills)
+ * @param {FormData} formData - FormData containing the PDF file
+ * @returns {Promise<Object>} Structured resume analysis
+ */
+export const analyzeResume = async (formData) => {
+  try {
+    console.log('Analyzing resume with AI...');
+    
+    // Log the contents of FormData
+    for (let [key, value] of formData.entries()) {
+      console.log(`FormData entry - Key: ${key}, Value:`, value);
+    }
+
+    // Use the configured API base URL instead of relative URL
+    const response = await fetch(`${API_BASE_URL}/api/resume/analyze`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    // Log the full response details
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+    // Get response text for debugging
+    const responseText = await response.text();
+    console.log('Raw Response Text:', responseText);
+
+    // Try to parse the response body
+    let responseData;
+    
+    try {
+      responseData = responseText ? JSON.parse(responseText) : null;
+      console.log('Parsed analysis response:', responseData);
+    } catch (parseError) {
+      console.error('JSON Parsing Error:', parseError);
+      console.log('Unparseable response text:', responseText);
+      throw new Error(`Unexpected response format: ${responseText}`);
+    }
+
+    // Check for error in the response
+    if (!response.ok) {
+      throw new Error(
+        responseData?.message || 
+        responseData?.error || 
+        'Failed to analyze resume. Please try again.'
+      );
+    }
+
+    // Validate response data
+    if (!responseData) {
+      throw new Error('No data received from server');
+    }
+
+    return responseData;
+  } catch (error) {
+    console.error('Resume Analysis Full Error:', error);
     
     // More detailed error logging
     if (error instanceof TypeError) {
