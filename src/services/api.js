@@ -67,7 +67,8 @@ export const uploadResume = async (formData) => {
       console.log(`FormData entry - Key: ${key}, Value:`, value);
     }
 
-    const response = await fetch('/api/resume/parse', {
+    // Use the configured API base URL instead of relative URL
+    const response = await fetch(`${API_BASE_URL}/api/resume/parse`, {
       method: 'POST',
       body: formData,
     });
