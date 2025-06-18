@@ -19,8 +19,27 @@ api.interceptors.request.use((config) => {
 });
 
 export const register = async (email) => {
-  const response = await api.post('/api/auth/register', { email });
-  return response.data;
+  try {
+    console.log('Attempting registration for:', email);
+    console.log('API Base URL:', API_BASE_URL);
+    
+    const response = await api.post('/api/auth/register', { email });
+    console.log('Registration successful:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Registration Error Details:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        baseURL: error.config?.baseURL
+      }
+    });
+    throw error;
+  }
 };
 
 export const verifyOTP = async (email, otp) => {
@@ -34,8 +53,27 @@ export const setupPassword = async (email, otp, password) => {
 };
 
 export const login = async (email, password) => {
-  const response = await api.post('/api/auth/login', { email, password });
-  return response.data;
+  try {
+    console.log('Attempting login for:', email);
+    console.log('API Base URL:', API_BASE_URL);
+    
+    const response = await api.post('/api/auth/login', { email, password });
+    console.log('Login successful:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Login Error Details:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        baseURL: error.config?.baseURL
+      }
+    });
+    throw error;
+  }
 };
 
 export const resendOTP = async (email) => {

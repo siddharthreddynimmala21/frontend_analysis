@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Backend Test</title>
+  </head>
+  <body>
+    <h1>Backend Connection Test</h1>
+    <div id="results"></div>
+
+    <script>
+      const API_BASE_URL = "https://your-backend-domain.com"; // Replace with your actual backend URL
+
+      async function testEndpoint(endpoint) {
+        try {
+          console.log(`Testing ${endpoint}...`);
+          const response = await fetch(`${API_BASE_URL}${endpoint}`);
+          const data = await response.text();
+
+          const result = {
+            endpoint,
+            status: response.status,
+            ok: response.ok,
+            data: data.substring(0, 200),
+          };
+
+          console.log("Result:", result);
+          return result;
+        } catch (error) {
+          console.error(`Error testing ${endpoint}:`, error);
+          return {
+            endpoint,
+            error: error.message,
+            ok: false,
+          };
+        }
+      }
+
+      async function runTests() {
+        const results = [];
+
+        results.push(await testEndpoint("/"));
+        results.push(await testEndpoint("/test"));
+        results.push(await testEndpoint("/api/auth/test"));
+        results.push(await testEndpoint("/api/resume/test"));
+
+        const resultsDiv = document.getElementById("results");
+        resultsDiv.innerHTML =
+          "<h2>Test Results:</h2>" +
+          results
+            .map(
+              (r) => `
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid ${
+                      r.ok ? "green" : "red"
+                    };">
+                        <strong>${r.endpoint}</strong><br>
+                        Status: ${r.status || "N/A"}<br>
+                        OK: ${r.ok}<br>
+                        ${r.data ? `Data: ${r.data}` : ""}
+                        ${r.error ? `Error: ${r.error}` : ""}
+                    </div>
+                `
+            )
+            .join("");
+      }
+
+      runTests();
+    </script>
+  </body>
+</html>
