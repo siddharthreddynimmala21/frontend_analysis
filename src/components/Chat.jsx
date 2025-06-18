@@ -60,74 +60,68 @@ export default function Chat() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
-      <motion.div 
-        className="w-full max-w-3xl h-[90vh] flex flex-col bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl overflow-hidden border border-white/20"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        {/* Header */}
-        <div className="p-4 border-b border-white/20 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <Navigation />
-            <h1 className="text-xl sm:text-2xl font-bold text-white">AI Chat</h1>
-          </div>
-          <button
-            onClick={() => setShowLogoutConfirm(true)}
-            className="flex items-center space-x-2 px-3 py-2 rounded-lg text-white/70 hover:bg-white/20 hover:text-white transition-colors duration-300"
-            aria-label="Log out"
-          >
-            <LogOut size={20} />
-            <span>Logout</span>
-          </button>
-        </div>
-
-        {/* Messages container */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-          {messages.map((message, index) => (
-            <motion.div
-              key={index}
-              variants={messageVariants}
-              initial="hidden"
-              animate="visible"
-            >
-              <ChatMessage
-                message={message.text}
-                isBot={message.isBot}
-              />
-            </motion.div>
-          ))}
-          {isLoading && (
-            <div className="flex items-center space-x-2">
-                <div className="w-10 h-10 rounded-full bg-gray-700/50 flex-shrink-0"></div>
-                <div className="p-3 bg-gray-700/50 rounded-lg">
-                    <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-75"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-150"></div>
-                    </div>
-                </div>
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 to-black text-white pt-28">
+      <Navigation showBack={false} />
+      <div className="flex flex-col items-center">
+        <motion.div 
+          className="w-full max-w-5xl h-[70vh] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-white/20"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {/* Header */}
+          <div className="p-4 border-b border-white/20 flex justify-between items-center bg-white/5">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-bold text-white">AI Chat</h1>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Input area */}
-        <div className="p-4 sm:p-6 border-t border-white/20">
-          <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
-        </div>
-      </motion.div>
+          {/* Messages container */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            {messages.map((message, index) => (
+              <motion.div
+                key={index}
+                variants={messageVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <ChatMessage
+                  message={message.text}
+                  isBot={message.isBot}
+                />
+              </motion.div>
+            ))}
+            {isLoading && (
+              <div className="flex items-center space-x-2">
+                  <div className="w-10 h-10 rounded-full bg-gray-700/50 flex-shrink-0"></div>
+                  <div className="p-3 bg-gray-700/50 rounded-lg">
+                      <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-75"></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-150"></div>
+                      </div>
+                  </div>
+              </div>
+            )}
+          </div>
 
-      {showLogoutConfirm && (
-        <ConfirmationDialog
-          message="Are you sure you want to log out?"
-          onConfirm={() => {
-            logout();
-            setShowLogoutConfirm(false);
-          }}
-          onCancel={() => setShowLogoutConfirm(false)}
-        />
-      )}
+          {/* Input area */}
+          <div className="p-4 sm:p-6 border-t border-white/20">
+            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+          </div>
+        </motion.div>
+
+        {showLogoutConfirm && (
+          <ConfirmationDialog
+            message="Are you sure you want to log out?"
+            onConfirm={() => {
+              logout();
+              setShowLogoutConfirm(false);
+            }}
+            onCancel={() => setShowLogoutConfirm(false)}
+          />
+        )}
+      </div>
     </div>
   );
 }

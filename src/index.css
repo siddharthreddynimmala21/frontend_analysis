@@ -2,8 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-gradient-to-br from-gray-900 to-gray-800 text-white font-sans;
+body, html {
+  @apply bg-gradient-to-br from-gray-900 to-black min-h-screen text-white font-sans antialiased;
 }
 
 @layer base {
@@ -12,7 +12,7 @@ body {
   }
   
   body {
-    @apply m-0 p-0 min-h-screen bg-gray-100 font-sans;
+    @apply m-0 p-0 min-h-screen font-sans;
   }
 }
 

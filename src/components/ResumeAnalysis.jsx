@@ -251,7 +251,7 @@ export default function ResumeAnalysis() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
       <Navigation />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 mt-32">
         <motion.div 
           variants={containerVariants}
           initial="hidden"

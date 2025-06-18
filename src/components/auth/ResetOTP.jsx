@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import toast from 'react-hot-toast';
-import { verifyOTP, resendOTP } from '../../services/api';
+import { verifyResetOTP, forgotPassword } from '../../services/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { KeyRound } from 'lucide-react';
 
-export default function VerifyOTP() {
+export default function ResetOTP() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const location = useLocation();
@@ -15,20 +15,16 @@ export default function VerifyOTP() {
   const email = location.state?.email;
 
   const formik = useFormik({
-    initialValues: {
-      otp: '',
-    },
+    initialValues: { otp: '' },
     validationSchema: Yup.object({
-      otp: Yup.string()
-        .required('OTP is required')
-        .matches(/^\d{6}$/, 'OTP must be 6 digits'),
+      otp: Yup.string().required('OTP is required').matches(/^\d{6}$/, 'OTP must be 6 digits'),
     }),
     onSubmit: async (values) => {
       try {
         setLoading(true);
-        await verifyOTP(email, values.otp);
-        toast.success('OTP verified successfully!');
-        navigate('/setup-password', { state: { email, otp: values.otp } });
+        await verifyResetOTP(email, values.otp);
+        toast.success('OTP verified!');
+        navigate('/reset-password', { state: { email, otp: values.otp } });
       } catch (error) {
         toast.error(error.response?.data?.message || 'OTP verification failed');
       } finally {
@@ -40,7 +36,7 @@ export default function VerifyOTP() {
   const handleResendOTP = async () => {
     try {
       setResending(true);
-      await resendOTP(email);
+      await forgotPassword(email);
       toast.success('New OTP sent to your email');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to resend OTP');
@@ -50,7 +46,7 @@ export default function VerifyOTP() {
   };
 
   if (!email) {
-    navigate('/register');
+    navigate('/forgot-password');
     return null;
   }
 
@@ -60,10 +56,7 @@ export default function VerifyOTP() {
       opacity: 1,
       y: 0,
       scale: 1,
-      transition: {
-        duration: 0.5,
-        ease: 'easeOut',
-      },
+      transition: { duration: 0.5, ease: 'easeOut' },
     },
   };
 
@@ -87,9 +80,7 @@ export default function VerifyOTP() {
         <form className="space-y-6" onSubmit={formik.handleSubmit} autoComplete="on">
           <div className="space-y-4">
             <div>
-              <label htmlFor="otp" className="sr-only">
-                OTP
-              </label>
+              <label htmlFor="otp" className="sr-only">OTP</label>
               <input
                 id="otp"
                 name="otp"
@@ -97,11 +88,7 @@ export default function VerifyOTP() {
                 autoComplete="one-time-code"
                 required
                 maxLength={6}
-                className={`appearance-none rounded-lg block w-full px-4 py-3 border text-white bg-gray-800/80 border-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 sm:text-base transition duration-300 ${
-                  formik.touched.otp && formik.errors.otp
-                    ? 'border-red-500 bg-red-500/10'
-                    : ''
-                }`}
+                className={`appearance-none rounded-lg block w-full px-4 py-3 border text-white bg-gray-800/80 border-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 sm:text-base transition duration-300 ${formik.touched.otp && formik.errors.otp ? 'border-red-500 bg-red-500/10' : ''}`}
                 placeholder="Enter OTP"
                 {...formik.getFieldProps('otp')}
               />
@@ -110,43 +97,25 @@ export default function VerifyOTP() {
               )}
             </div>
           </div>
-
-          {/* Divider and back to register placeholder */}
-          <div className="flex items-center justify-between mt-2 mb-2">
-            <span className="h-px flex-1 bg-white/10" />
-            <span className="px-3 text-xs text-gray-400">or</span>
-            <span className="h-px flex-1 bg-white/10" />
-          </div>
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center">
             <button
               type="button"
               className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors focus:outline-none"
-              tabIndex={-1}
-              onClick={() => navigate('/register')}
-            >
-              Back to register
-            </button>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 text-base"
-            disabled={loading}
-          >
-            {loading ? 'Verifying...' : 'Verify OTP'}
-          </button>
-          <div className="text-center mt-4">
-            <button
-              type="button"
               onClick={handleResendOTP}
               disabled={resending}
-              className="text-sm text-cyan-400 hover:text-cyan-300 focus:outline-none disabled:opacity-50 transition-colors"
             >
-              {resending ? 'Sending...' : 'Resend OTP'}
+              {resending ? 'Resending...' : 'Resend OTP'}
+            </button>
+            <button
+              type="submit"
+              className="py-3 px-6 rounded-lg font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 text-base"
+              disabled={loading}
+            >
+              {loading ? 'Verifying...' : 'Verify OTP'}
             </button>
           </div>
         </form>
       </motion.div>
     </div>
   );
-}
+} 

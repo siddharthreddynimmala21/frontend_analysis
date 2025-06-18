@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import toast from 'react-hot-toast';
-import { setupPassword } from '../../services/api';
+import { resetPassword } from '../../services/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
 
-export default function SetupPassword() {
+export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -15,26 +15,19 @@ export default function SetupPassword() {
   const otp = location.state?.otp;
 
   const formik = useFormik({
-    initialValues: {
-      password: '',
-      confirmPassword: '',
-    },
+    initialValues: { password: '', confirmPassword: '' },
     validationSchema: Yup.object({
-      password: Yup.string()
-        .min(6, 'Password must be at least 6 characters')
-        .required('Password is required'),
-      confirmPassword: Yup.string()
-        .oneOf([Yup.ref('password'), null], 'Passwords must match')
-        .required('Confirm your password'),
+      password: Yup.string().min(6, 'Password must be at least 6 characters').required('Password is required'),
+      confirmPassword: Yup.string().oneOf([Yup.ref('password'), null], 'Passwords must match').required('Confirm your password'),
     }),
     onSubmit: async (values) => {
       try {
         setLoading(true);
-        await setupPassword(email, otp, values.password);
-        toast.success('Password set successfully!');
+        await resetPassword(email, otp, values.password);
+        toast.success('Password reset successfully!');
         navigate('/login');
       } catch (error) {
-        toast.error(error.response?.data?.message || 'Failed to set password');
+        toast.error(error.response?.data?.message || 'Failed to reset password');
       } finally {
         setLoading(false);
       }
@@ -42,7 +35,7 @@ export default function SetupPassword() {
   });
 
   if (!email || !otp) {
-    navigate('/register');
+    navigate('/forgot-password');
     return null;
   }
 
@@ -52,10 +45,7 @@ export default function SetupPassword() {
       opacity: 1,
       y: 0,
       scale: 1,
-      transition: {
-        duration: 0.5,
-        ease: 'easeOut',
-      },
+      transition: { duration: 0.5, ease: 'easeOut' },
     },
   };
 
@@ -71,29 +61,23 @@ export default function SetupPassword() {
           <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 mb-2 shadow-lg">
             <Lock className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold text-center text-white">Set Your Password</h2>
+          <h2 className="text-3xl font-bold text-center text-white">Set New Password</h2>
           <p className="text-center text-sm text-gray-300">
-            Create a strong password for your account.
+            Enter and confirm your new password.
           </p>
         </div>
         <form className="space-y-6" onSubmit={formik.handleSubmit} autoComplete="on">
           <div className="space-y-4">
             <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
+              <label htmlFor="password" className="sr-only">Password</label>
               <input
                 id="password"
                 name="password"
                 type="password"
                 autoComplete="new-password"
                 required
-                className={`appearance-none rounded-lg block w-full px-4 py-3 border text-white bg-gray-800/80 border-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 sm:text-base transition duration-300 ${
-                  formik.touched.password && formik.errors.password
-                    ? 'border-red-500 bg-red-500/10'
-                    : ''
-                }`}
-                placeholder="Password"
+                className={`appearance-none rounded-lg block w-full px-4 py-3 border text-white bg-gray-800/80 border-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 sm:text-base transition duration-300 ${formik.touched.password && formik.errors.password ? 'border-red-500 bg-red-500/10' : ''}`}
+                placeholder="New password"
                 {...formik.getFieldProps('password')}
               />
               {formik.touched.password && formik.errors.password && (
@@ -101,21 +85,15 @@ export default function SetupPassword() {
               )}
             </div>
             <div>
-              <label htmlFor="confirmPassword" className="sr-only">
-                Confirm Password
-              </label>
+              <label htmlFor="confirmPassword" className="sr-only">Confirm Password</label>
               <input
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
                 autoComplete="new-password"
                 required
-                className={`appearance-none rounded-lg block w-full px-4 py-3 border text-white bg-gray-800/80 border-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 sm:text-base transition duration-300 ${
-                  formik.touched.confirmPassword && formik.errors.confirmPassword
-                    ? 'border-red-500 bg-red-500/10'
-                    : ''
-                }`}
-                placeholder="Confirm Password"
+                className={`appearance-none rounded-lg block w-full px-4 py-3 border text-white bg-gray-800/80 border-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 sm:text-base transition duration-300 ${formik.touched.confirmPassword && formik.errors.confirmPassword ? 'border-red-500 bg-red-500/10' : ''}`}
+                placeholder="Confirm new password"
                 {...formik.getFieldProps('confirmPassword')}
               />
               {formik.touched.confirmPassword && formik.errors.confirmPassword && (
@@ -123,33 +101,15 @@ export default function SetupPassword() {
               )}
             </div>
           </div>
-
-          {/* Divider and back to login placeholder */}
-          <div className="flex items-center justify-between mt-2 mb-2">
-            <span className="h-px flex-1 bg-white/10" />
-            <span className="px-3 text-xs text-gray-400">or</span>
-            <span className="h-px flex-1 bg-white/10" />
-          </div>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors focus:outline-none"
-              tabIndex={-1}
-              onClick={() => navigate('/login')}
-            >
-              Back to login
-            </button>
-          </div>
-
           <button
             type="submit"
             className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 text-base"
             disabled={loading}
           >
-            {loading ? 'Setting password...' : 'Set Password'}
+            {loading ? 'Resetting...' : 'Reset Password'}
           </button>
         </form>
       </motion.div>
     </div>
   );
-}
+} 
