@@ -319,3 +319,71 @@ export const getRoleRelevanceReport = async ({ currentRole, targetRole }) => {
     throw error;
   }
 };
+
+/**
+ * Extract and analyze projects section for ATS optimization
+ * @param {FormData} formData - FormData containing the PDF file
+ * @returns {Promise<Object>} Projects and ATS analysis
+ */
+export const analyzeProjects = async (formData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/resume/projects`, {
+      method: 'POST',
+      body: formData,
+    });
+    const responseText = await response.text();
+    let responseData;
+    try {
+      responseData = responseText ? JSON.parse(responseText) : null;
+    } catch (parseError) {
+      throw new Error(`Unexpected response format: ${responseText}`);
+    }
+    if (!response.ok) {
+      throw new Error(
+        responseData?.message || 
+        responseData?.error || 
+        'Failed to analyze projects. Please try again.'
+      );
+    }
+    if (!responseData) {
+      throw new Error('No data received from server');
+    }
+    return responseData;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Extract and analyze work experience section for ATS optimization
+ * @param {FormData} formData - FormData containing the PDF file
+ * @returns {Promise<Object>} Work experience and ATS analysis
+ */
+export const analyzeWorkExperience = async (formData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/resume/work-experience`, {
+      method: 'POST',
+      body: formData,
+    });
+    const responseText = await response.text();
+    let responseData;
+    try {
+      responseData = responseText ? JSON.parse(responseText) : null;
+    } catch (parseError) {
+      throw new Error(`Unexpected response format: ${responseText}`);
+    }
+    if (!response.ok) {
+      throw new Error(
+        responseData?.message || 
+        responseData?.error || 
+        'Failed to analyze work experience. Please try again.'
+      );
+    }
+    if (!responseData) {
+      throw new Error('No data received from server');
+    }
+    return responseData;
+  } catch (error) {
+    throw error;
+  }
+};

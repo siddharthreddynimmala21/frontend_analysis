@@ -288,31 +288,31 @@ export default function ResumeAnalysis() {
                 </button>
               </div>
             </div>
-            <div className="space-y-4">
-              <label className="block">
-                <input 
-                  type="file" 
-                  className="hidden"
-                  accept=".pdf"
-                  onChange={handleFileChange}
-                />
-                <div 
+          <div className="space-y-4">
+            <label className="block">
+              <input 
+                type="file" 
+                className="hidden"
+                accept=".pdf"
+                onChange={handleFileChange}
+              />
+              <div 
                   className="min-w-[160px] mx-auto py-2 px-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-md text-center cursor-pointer transition-all duration-300 text-sm block"
-                >
-                  <Upload className="w-5 h-5 inline mr-2" />
-                  Choose PDF
-                </div>
-              </label>
-              {file && (
-                <div className="text-center text-sm text-white/70">
-                  Selected: {file.name}
-                </div>
-              )}
-              <button
-                onClick={handleUpload}
-                disabled={!file || isLoading}
-                className="min-w-[160px] mx-auto block py-2 px-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium text-sm"
               >
+                  <Upload className="w-5 h-5 inline mr-2" />
+                Choose PDF
+              </div>
+            </label>
+            {file && (
+              <div className="text-center text-sm text-white/70">
+                Selected: {file.name}
+              </div>
+            )}
+            <button
+              onClick={handleUpload}
+              disabled={!file || isLoading}
+                className="min-w-[160px] mx-auto block py-2 px-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium text-sm"
+            >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
@@ -321,26 +321,26 @@ export default function ResumeAnalysis() {
                 ) : (
                   analysisType === 'ai' ? 'Upload and Analyze with AI' : 'Upload and Extract Text'
                 )}
-              </button>
-            </div>
-            {error && (
+            </button>
+          </div>
+          {error && (
               <motion.div 
                 variants={cardVariants}
                 className="bg-red-500/10 rounded-lg p-6 border border-red-500/20"
               >
-                <h3 className="text-xl font-semibold text-red-400 mb-4">Error</h3>
-                <div className="space-y-4 text-red-300">
-                  {error}
-                </div>
+              <h3 className="text-xl font-semibold text-red-400 mb-4">Error</h3>
+              <div className="space-y-4 text-red-300">
+                {error}
+              </div>
               </motion.div>
-            )}
+          )}
             {/* Analysis Results */}
-            {analysis && (
+          {analysis && (
               <div className="space-y-6">
                 {analysisType === 'ai' ? renderStructuredAnalysis() : renderTextAnalysis()}
-              </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
         </motion.div>
       </div>
     </div>

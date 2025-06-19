@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
-import { MessageSquare, FileText, Briefcase, UserCheck } from 'lucide-react';
+import { MessageSquare, FileText, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navigation from './common/Navigation';
 import React, { useState } from 'react';
-import { matchResumeSkills, generateJobDescription, getRoleRelevanceReport } from '../services/api';
+import { matchResumeSkills, generateJobDescription, getRoleRelevanceReport, analyzeProjects, analyzeWorkExperience } from '../services/api';
 
 // Minimal UI components (move outside Dashboard)
 const Card = ({ children, className = '' }) => (
@@ -114,24 +114,13 @@ function RoleRelevanceReportDisplay({ report }) {
     }
   }
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: 'easeOut' }}
-      className="space-y-4"
-    >
+    <div className="space-y-4">
       {percent && (
-        <div className="flex items-center space-x-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl p-4 shadow-inner mb-2">
-          <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 rounded-full shadow-lg">
-            <UserCheck className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <span className="text-4xl font-extrabold text-purple-600 dark:text-purple-300">{percent}%</span>
-            <div className="text-lg font-medium text-gray-700 dark:text-gray-300 ml-1">Role Relevance</div>
-          </div>
+        <div className="flex items-center space-x-4">
+          <span className="text-4xl font-extrabold text-purple-600 dark:text-purple-300">{percent}%</span>
+          <span className="text-lg font-medium text-gray-700 dark:text-gray-300">Role Relevance</span>
         </div>
       )}
-      <div className="border-b border-gray-300 dark:border-gray-700 my-2" />
       {overlaps.length > 0 && (
         <div>
           <div className="font-semibold text-green-700 dark:text-green-300 mb-1">Overlapping Responsibilities / Focus Areas</div>
@@ -159,7 +148,7 @@ function RoleRelevanceReportDisplay({ report }) {
       {!percent && !overlaps.length && !gaps.length && (
         <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap">{report}</pre>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -187,8 +176,13 @@ export default function Dashboard() {
   const [genRole, setGenRole] = useState('');
   const [genExperience, setGenExperience] = useState('');
   const [genCompany, setGenCompany] = useState('');
-  const [activeReport, setActiveReport] = useState('skill'); // 'skill' or 'role'
+  const [activeReport, setActiveReport] = useState('skill'); // 'skill' or 'role' or 'projects' or 'workexp'
   const [roleReport, setRoleReport] = useState(null);
+  const [suggestions, setSuggestions] = useState('');
+  const [projectsAnalysis, setProjectsAnalysis] = useState(null);
+  const [isProjectsLoading, setIsProjectsLoading] = useState(false);
+  const [workExpAnalysis, setWorkExpAnalysis] = useState(null);
+  const [isWorkExpLoading, setIsWorkExpLoading] = useState(false);
   const INDUSTRIES = [
     'Software', 'Finance', 'Healthcare', 'Education', 'Marketing', 'Sales', 'Engineering', 'Other'
   ];
@@ -222,6 +216,11 @@ export default function Dashboard() {
     setSkillsUsed([]);
     setRoleReport(null);
     setActiveReport('skill');
+    setSuggestions('');
+    setProjectsAnalysis(null);
+    setIsProjectsLoading(false);
+    setWorkExpAnalysis(null);
+    setIsWorkExpLoading(false);
     try {
       let formData = new FormData();
       // Prefer file upload if present, else use pasted text
@@ -237,6 +236,7 @@ export default function Dashboard() {
         return;
       }
       let finalJobDescription = jobDescription;
+      let targetRoleForPrompt = targetRole;
       if (jdMode === 'generate') {
         if (!genRole.trim() || !genExperience.trim()) {
           setError('Role and experience are required to generate a job description.');
@@ -248,9 +248,16 @@ export default function Dashboard() {
           role: genRole,
           company: genCompany
         });
-      } else {
+        targetRoleForPrompt = genRole;
+      }
+      else {
         if (!jobDescription.trim()) {
           setError('Job description is required.');
+          setIsProcessing(false);
+          return;
+        }
+        if (!targetRole.trim()) {
+          setError('Target Job Title / Role is required.');
           setIsProcessing(false);
           return;
         }
@@ -260,19 +267,35 @@ export default function Dashboard() {
         setIsProcessing(false);
         return;
       }
-      if (!targetRole.trim()) {
-        setError('Target Job Title / Role is required.');
-        setIsProcessing(false);
-        return;
-      }
       formData.append('jobDescription', finalJobDescription);
       // Call backend for skill match
       const result = await matchResumeSkills(formData);
       setSkillsUsed(result.skills || []);
       setMatchReport(result.matchReport || 'No report returned.');
+      setSuggestions(result.suggestions || '');
       // Call backend for role relevance
-      const roleReportResult = await getRoleRelevanceReport({ currentRole, targetRole });
+      const roleReportResult = await getRoleRelevanceReport({ currentRole, targetRole: targetRoleForPrompt });
       setRoleReport(roleReportResult);
+      // Call backend for projects ATS analysis
+      setIsProjectsLoading(true);
+      try {
+        const projectsResult = await analyzeProjects(formData);
+        setProjectsAnalysis(projectsResult);
+      } catch (projErr) {
+        setProjectsAnalysis({ error: projErr.message });
+      } finally {
+        setIsProjectsLoading(false);
+      }
+      // Call backend for work experience ATS analysis
+      setIsWorkExpLoading(true);
+      try {
+        const workExpResult = await analyzeWorkExperience(formData);
+        setWorkExpAnalysis(workExpResult);
+      } catch (workExpErr) {
+        setWorkExpAnalysis({ error: workExpErr.message });
+      } finally {
+        setIsWorkExpLoading(false);
+      }
     } catch (err) {
       setError(err.message || 'An error occurred while analyzing your resume.');
     } finally {
@@ -400,17 +423,6 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="target-role" className="text-gray-700 dark:text-gray-200">Target Job Title / Role</Label>
-                    <Input
-                      id="target-role"
-                      value={targetRole}
-                      onChange={(e) => setTargetRole(e.target.value)}
-                      placeholder="e.g., Software Engineer, Marketing Manager"
-                      required
-                      className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600"
-                    />
-                  </div>
-                  <div>
                     <Label htmlFor="current-role" className="text-gray-700 dark:text-gray-200">Current/Most Recent Job Title *</Label>
                     <Input
                       id="current-role"
@@ -420,15 +432,6 @@ export default function Dashboard() {
                       required
                       className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600"
                     />
-                  </div>
-                  <div>
-                    <Label htmlFor="experience" className="text-gray-700 dark:text-gray-200">Experience Level</Label>
-                    <Select value={experience} onChange={setExperience} className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600">
-                      <option value="">Select experience level</option>
-                      {EXPERIENCE_LEVELS.map((exp) => (
-                        <option key={exp} value={exp}>{exp}</option>
-                      ))}
-                    </Select>
                   </div>
                   {/* Job Description Input Mode Toggle */}
                   <div className="flex items-center gap-4 mb-2">
@@ -477,7 +480,7 @@ export default function Dashboard() {
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <Label htmlFor="gen-company" className="text-gray-700 dark:text-gray-200">Company (Optional)</Label>
+                        <Label htmlFor="gen-company" className="text-gray-700 dark:text-gray-200">Taraget Company (Optional)</Label>
                         <Input
                           id="gen-company"
                           value={genCompany}
@@ -541,7 +544,7 @@ export default function Dashboard() {
                   <AlertDescription className="text-red-800 dark:text-red-200">{error}</AlertDescription>
                 </Alert>
               )}
-              {(matchReport || roleReport) && (
+              {(matchReport || roleReport || projectsAnalysis || workExpAnalysis) && (
                 <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-gray-200 dark:border-gray-700 mt-8 animate-fade-in">
                   <div className="flex justify-between items-center mb-4">
                     <div className="flex gap-2">
@@ -559,22 +562,88 @@ export default function Dashboard() {
                       >
                         Role Relevance
                       </button>
+                      <button
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${activeReport === 'projects' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}
+                        onClick={() => setActiveReport('projects')}
+                        disabled={activeReport === 'projects'}
+                      >
+                        Projects ATS Analysis
+                      </button>
+                      <button
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${activeReport === 'workexp' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}
+                        onClick={() => setActiveReport('workexp')}
+                        disabled={activeReport === 'workexp'}
+                      >
+                        Work Experience ATS Analysis
+                      </button>
                     </div>
                   </div>
                   <CardHeader>
                     <CardTitle className="text-2xl font-bold text-purple-700 dark:text-purple-300 mb-2">
-                      {activeReport === 'skill' ? 'Skill Match' : 'Role Relevance'}
+                      {activeReport === 'skill' ? 'Skill Match' : activeReport === 'role' ? 'Role Relevance' : activeReport === 'projects' ? 'Projects ATS Analysis' : 'Work Experience ATS Analysis'}
                     </CardTitle>
                     <CardDescription className="text-gray-700 dark:text-gray-300">
-                      {activeReport === 'skill' ? 'AI-powered skill match analysis' : 'AI-powered role relevance analysis'}
+                      {activeReport === 'skill' ? 'AI-powered skill match analysis' : activeReport === 'role' ? 'AI-powered role relevance analysis' : activeReport === 'projects' ? 'AI-powered ATS optimization for your projects section' : 'AI-powered ATS optimization for your work experience section'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {activeReport === 'skill' && matchReport && (
-                      <SkillMatchReportDisplay report={matchReport} skills={skillsUsed} />
+                      <>
+                        <SkillMatchReportDisplay report={matchReport} skills={skillsUsed} />
+                        {suggestions && (
+                          <div className="mt-6">
+                            <div className="font-semibold text-blue-700 dark:text-blue-300 mb-1">Suggestions to Improve Skill Match</div>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-blue-900 dark:text-blue-100 whitespace-pre-line text-base">
+                              {suggestions}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                     {activeReport === 'role' && roleReport && (
                       <RoleRelevanceReportDisplay report={roleReport} />
+                    )}
+                    {activeReport === 'projects' && (
+                      <div>
+                        {isProjectsLoading ? (
+                          <div className="flex items-center space-x-2 text-blue-700 dark:text-blue-300">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700 dark:border-blue-300"></div>
+                            <span>Analyzing Projects Section...</span>
+                          </div>
+                        ) : projectsAnalysis && projectsAnalysis.atsAnalysis ? (
+                          <div>
+                            <div className="font-semibold text-blue-700 dark:text-blue-300 mb-1">Projects ATS Analysis</div>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-blue-900 dark:text-blue-100 whitespace-pre-line text-base">
+                              {projectsAnalysis.atsAnalysis}
+                            </div>
+                          </div>
+                        ) : projectsAnalysis && projectsAnalysis.error ? (
+                          <div className="text-red-600 dark:text-red-300">{projectsAnalysis.error}</div>
+                        ) : (
+                          <div className="text-gray-500 dark:text-gray-400">No projects analysis available.</div>
+                        )}
+                      </div>
+                    )}
+                    {activeReport === 'workexp' && (
+                      <div>
+                        {isWorkExpLoading ? (
+                          <div className="flex items-center space-x-2 text-blue-700 dark:text-blue-300">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700 dark:border-blue-300"></div>
+                            <span>Analyzing Work Experience Section...</span>
+                          </div>
+                        ) : workExpAnalysis && workExpAnalysis.atsAnalysis ? (
+                          <div>
+                            <div className="font-semibold text-blue-700 dark:text-blue-300 mb-1">Work Experience ATS Analysis</div>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-blue-900 dark:text-blue-100 whitespace-pre-line text-base">
+                              {workExpAnalysis.atsAnalysis}
+                            </div>
+                          </div>
+                        ) : workExpAnalysis && workExpAnalysis.error ? (
+                          <div className="text-red-600 dark:text-red-300">{workExpAnalysis.error}</div>
+                        ) : (
+                          <div className="text-gray-500 dark:text-gray-400">No work experience analysis available.</div>
+                        )}
+                      </div>
                     )}
                   </CardContent>
                 </Card>
