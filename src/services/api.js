@@ -241,3 +241,37 @@ export const resetPassword = async (email, otp, password) => {
   const response = await api.post('/api/auth/reset-password', { email, otp, password });
   return response.data;
 };
+
+/**
+ * Upload resume and job description, match skills using Gemini
+ * @param {FormData} formData - FormData containing the PDF file and jobDescription
+ * @returns {Promise<Object>} Skill match report
+ */
+export const matchResumeSkills = async (formData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/resume/match-skills`, {
+      method: 'POST',
+      body: formData,
+    });
+    const responseText = await response.text();
+    let responseData;
+    try {
+      responseData = responseText ? JSON.parse(responseText) : null;
+    } catch (parseError) {
+      throw new Error(`Unexpected response format: ${responseText}`);
+    }
+    if (!response.ok) {
+      throw new Error(
+        responseData?.message || 
+        responseData?.error || 
+        'Failed to match skills. Please try again.'
+      );
+    }
+    if (!responseData) {
+      throw new Error('No data received from server');
+    }
+    return responseData;
+  } catch (error) {
+    throw error;
+  }
+};

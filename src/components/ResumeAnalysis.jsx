@@ -5,15 +5,18 @@ import { useAuth } from '../context/AuthContext';
 import ConfirmationDialog from './common/ConfirmationDialog';
 import Navigation from './common/Navigation';
 import { uploadResume, analyzeResume } from '../services/api';
+import { useLocation } from 'react-router-dom';
 
 export default function ResumeAnalysis() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const initialType = location.state?.analysisType || 'ai';
   const [file, setFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState(null);
-  const [analysisType, setAnalysisType] = useState('ai'); // 'ai' or 'text'
+  const [analysisType, setAnalysisType] = useState(initialType); // 'ai' or 'text'
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
@@ -258,17 +261,16 @@ export default function ResumeAnalysis() {
           animate="visible"
           className="max-w-4xl mx-auto space-y-6"
         >
-          <div className="bg-white/5 rounded-xl shadow-lg p-6">
-            <h2 className="text-3xl font-bold text-center mb-6">Resume Analysis</h2>
-            
+          <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/50 p-6">
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-white bg-clip-text text-transparent text-center mb-6">Resume Analysis</h2>
             {/* Analysis Type Selection */}
             <div className="flex justify-center mb-6">
               <div className="bg-gray-800/50 rounded-lg p-1 flex">
                 <button
                   onClick={() => setAnalysisType('ai')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`min-w-[120px] px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
                     analysisType === 'ai'
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
@@ -276,9 +278,9 @@ export default function ResumeAnalysis() {
                 </button>
                 <button
                   onClick={() => setAnalysisType('text')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`min-w-[120px] px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
                     analysisType === 'text'
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
@@ -286,7 +288,6 @@ export default function ResumeAnalysis() {
                 </button>
               </div>
             </div>
-            
             <div className="space-y-4">
               <label className="block">
                 <input 
@@ -296,23 +297,21 @@ export default function ResumeAnalysis() {
                   onChange={handleFileChange}
                 />
                 <div 
-                  className="w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-lg text-center cursor-pointer transition-all duration-300"
+                  className="min-w-[160px] mx-auto py-2 px-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-md text-center cursor-pointer transition-all duration-300 text-sm block"
                 >
                   <Upload className="w-5 h-5 inline mr-2" />
                   Choose PDF
                 </div>
               </label>
-
               {file && (
                 <div className="text-center text-sm text-white/70">
                   Selected: {file.name}
                 </div>
               )}
-
               <button
                 onClick={handleUpload}
                 disabled={!file || isLoading}
-                className="w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium"
+                className="min-w-[160px] mx-auto block py-2 px-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium text-sm"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
@@ -324,26 +323,24 @@ export default function ResumeAnalysis() {
                 )}
               </button>
             </div>
-          </div>
-
-          {error && (
-            <motion.div 
-              variants={cardVariants}
-              className="bg-red-500/10 rounded-lg p-6 border border-red-500/20"
-            >
-              <h3 className="text-xl font-semibold text-red-400 mb-4">Error</h3>
-              <div className="space-y-4 text-red-300">
-                {error}
+            {error && (
+              <motion.div 
+                variants={cardVariants}
+                className="bg-red-500/10 rounded-lg p-6 border border-red-500/20"
+              >
+                <h3 className="text-xl font-semibold text-red-400 mb-4">Error</h3>
+                <div className="space-y-4 text-red-300">
+                  {error}
+                </div>
+              </motion.div>
+            )}
+            {/* Analysis Results */}
+            {analysis && (
+              <div className="space-y-6">
+                {analysisType === 'ai' ? renderStructuredAnalysis() : renderTextAnalysis()}
               </div>
-            </motion.div>
-          )}
-
-          {/* Analysis Results */}
-          {analysis && (
-            <div className="space-y-6">
-              {analysisType === 'ai' ? renderStructuredAnalysis() : renderTextAnalysis()}
-            </div>
-          )}
+            )}
+          </div>
         </motion.div>
       </div>
     </div>

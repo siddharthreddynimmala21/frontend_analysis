@@ -17,45 +17,45 @@ import ResetPassword from './components/auth/ResetPassword';
 function App() {
   return (
     <ThemeProvider>
-      <Router>
-        <AuthProvider>
-          <Toaster position="top-right" />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/verify-otp" element={<VerifyOTP />} />
-            <Route path="/setup-password" element={<SetupPassword />} />
+    <Router>
+      <AuthProvider>
+        <Toaster position="top-right" />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/verify-otp" element={<VerifyOTP />} />
+          <Route path="/setup-password" element={<SetupPassword />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-otp" element={<ResetOTP />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/chat"
-              element={
-                <ProtectedRoute>
-                  <Chat />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/resume-analysis"
-              element={
-                <ProtectedRoute>
-                  <ResumeAnalysis />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </AuthProvider>
-      </Router>
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute>
+                <Chat />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resume-analysis"
+            element={
+              <ProtectedRoute>
+                <ResumeAnalysis />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </AuthProvider>
+    </Router>
     </ThemeProvider>
   );
 }

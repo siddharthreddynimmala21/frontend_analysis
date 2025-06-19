@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { resetPassword } from '../../services/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock } from 'lucide-react';
+import { Lock, AlertTriangle } from 'lucide-react';
 
 export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
@@ -51,65 +51,75 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white px-4 py-12">
-      <motion.div
-        className="w-full max-w-md p-8 sm:p-10 bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 space-y-8"
-        variants={cardVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <div className="flex flex-col items-center space-y-2">
-          <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 mb-2 shadow-lg">
-            <Lock className="w-8 h-8 text-white" />
+      <div className="w-full max-w-md shadow-2xl border border-white/30 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl">
+        <div className="text-center space-y-4 p-8 sm:p-10">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-white rounded-sm transform rotate-12"></div>
           </div>
-          <h2 className="text-3xl font-bold text-center text-white">Set New Password</h2>
-          <p className="text-center text-sm text-gray-300">
+          <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            Set New Password
+          </div>
+          <div className="text-gray-600 dark:text-gray-300">
             Enter and confirm your new password.
-          </p>
+          </div>
         </div>
-        <form className="space-y-6" onSubmit={formik.handleSubmit} autoComplete="on">
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="password" className="sr-only">Password</label>
+        <div className="px-8 pb-8">
+          <form className="space-y-4" onSubmit={formik.handleSubmit} autoComplete="on">
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-gray-700 dark:text-gray-200">Password</label>
               <input
                 id="password"
                 name="password"
                 type="password"
                 autoComplete="new-password"
                 required
-                className={`appearance-none rounded-lg block w-full px-4 py-3 border text-white bg-gray-800/80 border-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 sm:text-base transition duration-300 ${formik.touched.password && formik.errors.password ? 'border-red-500 bg-red-500/10' : ''}`}
-                placeholder="New password"
+                className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-purple-500 transition-all duration-200 appearance-none rounded-lg block w-full px-4 py-2 border text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none sm:text-base"
+                placeholder="Enter new password"
                 {...formik.getFieldProps('password')}
               />
               {formik.touched.password && formik.errors.password && (
-                <div className="text-red-500 text-sm mt-1">{formik.errors.password}</div>
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 flex items-center space-x-2 mt-1">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <span className="text-red-800 dark:text-red-200 text-sm">{formik.errors.password}</span>
+                </div>
               )}
             </div>
-            <div>
-              <label htmlFor="confirmPassword" className="sr-only">Confirm Password</label>
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-gray-700 dark:text-gray-200">Confirm Password</label>
               <input
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
                 autoComplete="new-password"
                 required
-                className={`appearance-none rounded-lg block w-full px-4 py-3 border text-white bg-gray-800/80 border-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 sm:text-base transition duration-300 ${formik.touched.confirmPassword && formik.errors.confirmPassword ? 'border-red-500 bg-red-500/10' : ''}`}
+                className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-purple-500 transition-all duration-200 appearance-none rounded-lg block w-full px-4 py-2 border text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none sm:text-base"
                 placeholder="Confirm new password"
                 {...formik.getFieldProps('confirmPassword')}
               />
               {formik.touched.confirmPassword && formik.errors.confirmPassword && (
-                <div className="text-red-500 text-sm mt-1">{formik.errors.confirmPassword}</div>
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 flex items-center space-x-2 mt-1">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <span className="text-red-800 dark:text-red-200 text-sm">{formik.errors.confirmPassword}</span>
+                </div>
               )}
             </div>
-          </div>
-          <button
-            type="submit"
-            className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 text-base"
-            disabled={loading}
-          >
-            {loading ? 'Resetting...' : 'Reset Password'}
-          </button>
-        </form>
-      </motion.div>
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition-all duration-200 text-white border-0 py-3 px-4 rounded-lg font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-base flex items-center justify-center"
+              disabled={loading}
+            >
+              {loading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Resetting...</span>
+                </div>
+              ) : (
+                'Reset Password'
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 } 
