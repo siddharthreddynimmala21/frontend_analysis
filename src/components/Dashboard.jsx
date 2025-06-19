@@ -3,7 +3,7 @@ import { MessageSquare, FileText, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navigation from './common/Navigation';
 import React, { useState } from 'react';
-import { matchResumeSkills } from '../services/api';
+import { matchResumeSkills, generateJobDescription } from '../services/api';
 
 // Minimal UI components (move outside Dashboard)
 const Card = ({ children, className = '' }) => (
@@ -110,6 +110,10 @@ export default function Dashboard() {
   const [resumeFile, setResumeFile] = useState(null);
   const [matchReport, setMatchReport] = useState(null);
   const [skillsUsed, setSkillsUsed] = useState([]);
+  const [jdMode, setJdMode] = useState('paste'); // 'paste' or 'generate'
+  const [genRole, setGenRole] = useState('');
+  const [genExperience, setGenExperience] = useState('');
+  const [genCompany, setGenCompany] = useState('');
   const INDUSTRIES = [
     'Software', 'Finance', 'Healthcare', 'Education', 'Marketing', 'Sales', 'Engineering', 'Other'
   ];
@@ -155,12 +159,26 @@ export default function Dashboard() {
         setIsProcessing(false);
         return;
       }
-      if (!jobDescription.trim()) {
-        setError('Job description is required.');
-        setIsProcessing(false);
-        return;
+      let finalJobDescription = jobDescription;
+      if (jdMode === 'generate') {
+        if (!genRole.trim() || !genExperience.trim()) {
+          setError('Role and experience are required to generate a job description.');
+          setIsProcessing(false);
+          return;
+        }
+        finalJobDescription = await generateJobDescription({
+          experience: genExperience,
+          role: genRole,
+          company: genCompany
+        });
+      } else {
+        if (!jobDescription.trim()) {
+          setError('Job description is required.');
+          setIsProcessing(false);
+          return;
+        }
       }
-      formData.append('jobDescription', jobDescription);
+      formData.append('jobDescription', finalJobDescription);
       // Call backend
       const result = await matchResumeSkills(formData);
       setSkillsUsed(result.skills || []);
@@ -303,16 +321,6 @@ export default function Dashboard() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="job-description" className="text-gray-700 dark:text-gray-200">Job Description (Full Text)</Label>
-                    <Textarea
-                      id="job-description"
-                      value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
-                      placeholder="Paste the complete job description for better keyword alignment..."
-                      className="min-h-[100px] bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600"
-                    />
-                  </div>
-                  <div>
                     <Label htmlFor="current-role" className="text-gray-700 dark:text-gray-200">Current/Most Recent Job Title</Label>
                     <Input
                       id="current-role"
@@ -331,6 +339,64 @@ export default function Dashboard() {
                       ))}
                     </Select>
                   </div>
+                  {/* Job Description Input Mode Toggle */}
+                  <div className="flex items-center gap-4 mb-2">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="jdMode" value="paste" checked={jdMode === 'paste'} onChange={() => setJdMode('paste')} />
+                      <span>Paste Job Description</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="jdMode" value="generate" checked={jdMode === 'generate'} onChange={() => setJdMode('generate')} />
+                      <span>Generate from Details</span>
+                    </label>
+                  </div>
+                  {/* Paste JD */}
+                  {jdMode === 'paste' && (
+                    <div>
+                      <Label htmlFor="job-description" className="text-gray-700 dark:text-gray-200">Job Description (Full Text)</Label>
+                      <Textarea
+                        id="job-description"
+                        value={jobDescription}
+                        onChange={(e) => setJobDescription(e.target.value)}
+                        placeholder="Paste the complete job description for better keyword alignment..."
+                        className="min-h-[100px] bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600"
+                      />
+                    </div>
+                  )}
+                  {/* Generate JD */}
+                  {jdMode === 'generate' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="gen-experience" className="text-gray-700 dark:text-gray-200">Experience Level *</Label>
+                        <Select id="gen-experience" value={genExperience} onChange={setGenExperience} className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600">
+                          <option value="">Select experience level</option>
+                          {EXPERIENCE_LEVELS.map((exp) => (
+                            <option key={exp} value={exp}>{exp}</option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="gen-role" className="text-gray-700 dark:text-gray-200">Target Role *</Label>
+                        <Input
+                          id="gen-role"
+                          value={genRole}
+                          onChange={(e) => setGenRole(e.target.value)}
+                          placeholder="e.g., Software Engineer, Marketing Manager"
+                          className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label htmlFor="gen-company" className="text-gray-700 dark:text-gray-200">Company (Optional)</Label>
+                        <Input
+                          id="gen-company"
+                          value={genCompany}
+                          onChange={(e) => setGenCompany(e.target.value)}
+                          placeholder="e.g., Google, Microsoft"
+                          className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

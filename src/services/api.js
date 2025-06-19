@@ -275,3 +275,25 @@ export const matchResumeSkills = async (formData) => {
     throw error;
   }
 };
+
+/**
+ * Generate a job description using Gemini based on experience, role, and company
+ * @param {Object} params - { experience, role, company }
+ * @returns {Promise<string>} Generated job description
+ */
+export const generateJobDescription = async ({ experience, role, company }) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/resume/generate-jd`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ experience, role, company }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || 'Failed to generate job description');
+    }
+    return data.jobDescription;
+  } catch (error) {
+    throw error;
+  }
+};
