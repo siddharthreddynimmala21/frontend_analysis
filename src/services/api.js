@@ -297,3 +297,25 @@ export const generateJobDescription = async ({ experience, role, company }) => {
     throw error;
   }
 };
+
+/**
+ * Get role relevance score using Gemini based on currentRole and targetRole
+ * @param {Object} params - { currentRole, targetRole }
+ * @returns {Promise<string>} Role relevance report
+ */
+export const getRoleRelevanceReport = async ({ currentRole, targetRole }) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/resume/role-relevance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentRole, targetRole }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || 'Failed to get role relevance report');
+    }
+    return data.report;
+  } catch (error) {
+    throw error;
+  }
+};

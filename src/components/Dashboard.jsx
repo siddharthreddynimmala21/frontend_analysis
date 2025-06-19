@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
-import { MessageSquare, FileText, Briefcase } from 'lucide-react';
+import { MessageSquare, FileText, Briefcase, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navigation from './common/Navigation';
 import React, { useState } from 'react';
-import { matchResumeSkills, generateJobDescription } from '../services/api';
+import { matchResumeSkills, generateJobDescription, getRoleRelevanceReport } from '../services/api';
 
 // Minimal UI components (move outside Dashboard)
 const Card = ({ children, className = '' }) => (
@@ -90,6 +90,79 @@ function SkillMatchReportDisplay({ report, skills }) {
   );
 }
 
+function RoleRelevanceReportDisplay({ report }) {
+  // Try to parse the report for structured display
+  let percent = null, overlaps = [], gaps = [], justification = '';
+  if (typeof report === 'string') {
+    // Score
+    const percentMatch = report.match(/(\d{1,3})\s*%|score out of 100:?\s*(\d{1,3})/i);
+    percent = percentMatch ? (percentMatch[1] || percentMatch[2]) : null;
+    // Overlaps
+    const overlapMatch = report.match(/overlapping responsibilities or focus areas:?\s*([\s\S]*?)\n(?:gaps|mismatches|$)/i);
+    if (overlapMatch) {
+      overlaps = overlapMatch[1].split(/,|\n/).map(s => s.trim()).filter(Boolean);
+    }
+    // Gaps
+    const gapsMatch = report.match(/gaps or mismatches:?\s*([\s\S]*?)\n(?:justification|$)/i);
+    if (gapsMatch) {
+      gaps = gapsMatch[1].split(/,|\n/).map(s => s.trim()).filter(Boolean);
+    }
+    // Justification
+    const justificationMatch = report.match(/justification:?\s*([\s\S]*)/i);
+    if (justificationMatch) {
+      justification = justificationMatch[1].split('\n')[0].trim();
+    }
+  }
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+      className="space-y-4"
+    >
+      {percent && (
+        <div className="flex items-center space-x-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl p-4 shadow-inner mb-2">
+          <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 rounded-full shadow-lg">
+            <UserCheck className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <span className="text-4xl font-extrabold text-purple-600 dark:text-purple-300">{percent}%</span>
+            <div className="text-lg font-medium text-gray-700 dark:text-gray-300 ml-1">Role Relevance</div>
+          </div>
+        </div>
+      )}
+      <div className="border-b border-gray-300 dark:border-gray-700 my-2" />
+      {overlaps.length > 0 && (
+        <div>
+          <div className="font-semibold text-green-700 dark:text-green-300 mb-1">Overlapping Responsibilities / Focus Areas</div>
+          <div className="flex flex-wrap gap-2">
+            {overlaps.map((item, i) => (
+              <span key={i} className="bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm border border-green-400/30">{item}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {gaps.length > 0 && (
+        <div>
+          <div className="font-semibold text-red-700 dark:text-red-300 mb-1">Gaps / Mismatches</div>
+          <div className="flex flex-wrap gap-2">
+            {gaps.map((item, i) => (
+              <span key={i} className="bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 px-3 py-1 rounded-full text-sm border border-red-400/30">{item}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {justification && (
+        <div className="italic text-gray-700 dark:text-gray-300">{justification}</div>
+      )}
+      {/* Raw report fallback */}
+      {!percent && !overlaps.length && !gaps.length && (
+        <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap">{report}</pre>
+      )}
+    </motion.div>
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [showAIResumeForm, setShowAIResumeForm] = useState(false);
@@ -114,6 +187,8 @@ export default function Dashboard() {
   const [genRole, setGenRole] = useState('');
   const [genExperience, setGenExperience] = useState('');
   const [genCompany, setGenCompany] = useState('');
+  const [activeReport, setActiveReport] = useState('skill'); // 'skill' or 'role'
+  const [roleReport, setRoleReport] = useState(null);
   const INDUSTRIES = [
     'Software', 'Finance', 'Healthcare', 'Education', 'Marketing', 'Sales', 'Engineering', 'Other'
   ];
@@ -145,6 +220,8 @@ export default function Dashboard() {
     setIsProcessing(true);
     setMatchReport(null);
     setSkillsUsed([]);
+    setRoleReport(null);
+    setActiveReport('skill');
     try {
       let formData = new FormData();
       // Prefer file upload if present, else use pasted text
@@ -178,11 +255,24 @@ export default function Dashboard() {
           return;
         }
       }
+      if (!currentRole.trim()) {
+        setError('Current/Most Recent Job Title is required.');
+        setIsProcessing(false);
+        return;
+      }
+      if (!targetRole.trim()) {
+        setError('Target Job Title / Role is required.');
+        setIsProcessing(false);
+        return;
+      }
       formData.append('jobDescription', finalJobDescription);
-      // Call backend
+      // Call backend for skill match
       const result = await matchResumeSkills(formData);
       setSkillsUsed(result.skills || []);
       setMatchReport(result.matchReport || 'No report returned.');
+      // Call backend for role relevance
+      const roleReportResult = await getRoleRelevanceReport({ currentRole, targetRole });
+      setRoleReport(roleReportResult);
     } catch (err) {
       setError(err.message || 'An error occurred while analyzing your resume.');
     } finally {
@@ -207,7 +297,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white p-4 sm:p-6 lg:p-8">
       {/* Navbar at the very top */}
-      <Navigation showBack={false} />
+            <Navigation showBack={false} />
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center w-full mt-6">
         {!showAIResumeForm ? (
@@ -239,11 +329,11 @@ export default function Dashboard() {
             >
               <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-6 shadow-lg">
                 <FileText className="w-10 h-10 text-white" />
-              </div>
+                </div>
               <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-white bg-clip-text text-transparent mb-2">Resume Analysis</h2>
               <p className="text-gray-600 dark:text-gray-300 text-base">
-                Upload your resume for AI-powered analysis and personalized feedback.
-              </p>
+                  Upload your resume for AI-powered analysis and personalized feedback.
+                </p>
             </motion.div>
 
             {/* AI Resume Analysis Option */}
@@ -321,12 +411,13 @@ export default function Dashboard() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="current-role" className="text-gray-700 dark:text-gray-200">Current/Most Recent Job Title</Label>
+                    <Label htmlFor="current-role" className="text-gray-700 dark:text-gray-200">Current/Most Recent Job Title *</Label>
                     <Input
                       id="current-role"
                       value={currentRole}
                       onChange={(e) => setCurrentRole(e.target.value)}
                       placeholder="Your current position"
+                      required
                       className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600"
                     />
                   </div>
@@ -394,8 +485,8 @@ export default function Dashboard() {
                           placeholder="e.g., Google, Microsoft"
                           className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600"
                         />
-                      </div>
-                    </div>
+          </div>
+        </div>
                   )}
                 </CardContent>
               </Card>
@@ -450,15 +541,41 @@ export default function Dashboard() {
                   <AlertDescription className="text-red-800 dark:text-red-200">{error}</AlertDescription>
                 </Alert>
               )}
-              {matchReport && (
+              {(matchReport || roleReport) && (
                 <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-gray-200 dark:border-gray-700 mt-8 animate-fade-in">
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="flex gap-2">
+                      <button
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${activeReport === 'skill' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}
+                        onClick={() => setActiveReport('skill')}
+                        disabled={activeReport === 'skill'}
+                      >
+                        Skill Match
+                      </button>
+                      <button
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${activeReport === 'role' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}
+                        onClick={() => setActiveReport('role')}
+                        disabled={activeReport === 'role'}
+                      >
+                        Role Relevance
+                      </button>
+                    </div>
+                  </div>
                   <CardHeader>
-                    <CardTitle className="text-2xl font-bold text-purple-700 dark:text-purple-300 mb-2">Skill Match Report</CardTitle>
-                    <CardDescription className="text-gray-700 dark:text-gray-300">AI-powered skill match analysis</CardDescription>
+                    <CardTitle className="text-2xl font-bold text-purple-700 dark:text-purple-300 mb-2">
+                      {activeReport === 'skill' ? 'Skill Match' : 'Role Relevance'}
+                    </CardTitle>
+                    <CardDescription className="text-gray-700 dark:text-gray-300">
+                      {activeReport === 'skill' ? 'AI-powered skill match analysis' : 'AI-powered role relevance analysis'}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Try to parse the report for pretty display */}
-                    <SkillMatchReportDisplay report={matchReport} skills={skillsUsed} />
+                    {activeReport === 'skill' && matchReport && (
+                      <SkillMatchReportDisplay report={matchReport} skills={skillsUsed} />
+                    )}
+                    {activeReport === 'role' && roleReport && (
+                      <RoleRelevanceReportDisplay report={roleReport} />
+                    )}
                   </CardContent>
                 </Card>
               )}

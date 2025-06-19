@@ -21,16 +21,16 @@ export default function Navigation({ showBack = false }) {
       </div>
       {/* Center: Back (optional) */}
       <div className="flex items-center space-x-2">
-        {showBack && (
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center space-x-2 px-3 py-2 rounded-lg text-white/70 hover:bg-white/20 hover:text-white transition-colors duration-300"
-            aria-label="Go back"
-          >
-            <ArrowLeft size={20} />
-            <span>Back</span>
-          </button>
-        )}
+      {showBack && (
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center space-x-2 px-3 py-2 rounded-lg text-white/70 hover:bg-white/20 hover:text-white transition-colors duration-300"
+          aria-label="Go back"
+        >
+          <ArrowLeft size={20} />
+          <span>Back</span>
+        </button>
+      )}
       </div>
       {/* Right: Theme Switcher and Logout */}
       <div className="flex items-center space-x-2">
@@ -42,16 +42,16 @@ export default function Navigation({ showBack = false }) {
           {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </button>
         {logout && (
-          <button
+      <button
             onClick={logout}
             className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200 text-base font-semibold"
             aria-label="Log out"
-          >
+      >
             <LogOut className="w-4 h-4 mr-2" />
             <span>Logout</span>
-          </button>
+      </button>
         )}
-      </div>
+    </div>
     </nav>
   );
 } 

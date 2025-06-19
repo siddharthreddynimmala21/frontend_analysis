@@ -120,7 +120,7 @@ export default function Login() {
               >
                 Forgot password?
               </button>
-            </div>
+          </div>
             <button
               type="submit"
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition-all duration-200 text-white border-0 py-3 px-4 rounded-lg font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-base flex items-center justify-center"
@@ -143,8 +143,8 @@ export default function Login() {
               >
                 create a new account
               </Link>
-            </div>
-          </form>
+          </div>
+        </form>
         </div>
       </div>
     </div>
