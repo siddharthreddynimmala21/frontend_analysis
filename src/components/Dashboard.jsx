@@ -324,13 +324,13 @@ export default function Dashboard() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center w-full mt-6">
         {!showAIResumeForm ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-3xl mx-auto place-items-center">
             {/* AI Chat Option */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/50 p-8 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
+              className="w-full max-w-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/50 p-10 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
               onClick={() => navigate('/chat')}
             >
               <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-6 shadow-lg">
@@ -343,6 +343,7 @@ export default function Dashboard() {
             </motion.div>
 
             {/* Resume Analysis Option */}
+            {/**
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -358,13 +359,14 @@ export default function Dashboard() {
                   Upload your resume for AI-powered analysis and personalized feedback.
                 </p>
             </motion.div>
+            **/}
 
             {/* AI Resume Analysis Option */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/50 p-8 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
+              className="w-full max-w-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/30 dark:border-gray-700/50 p-10 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
               onClick={() => setShowAIResumeForm(true)}
             >
               <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-6 shadow-lg">
@@ -372,7 +374,7 @@ export default function Dashboard() {
               </div>
               <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-white bg-clip-text text-transparent mb-2">AI Resume Analysis</h2>
               <p className="text-gray-600 dark:text-gray-300 text-base">
-                Get a structured, AI-powered breakdown of your resume's work experience, education, and skills.
+                Upload your resume for AI-powered analysis and personalized feedback.
               </p>
             </motion.div>
           </div>
