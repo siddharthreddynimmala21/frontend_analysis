@@ -69,7 +69,7 @@ export default function Login() {
         <div className="px-8 pb-8">
           <form className="space-y-4" onSubmit={formik.handleSubmit} autoComplete="on">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-gray-700 dark:text-gray-200">User ID</label>
+              <label htmlFor="email" className="text-gray-700 dark:text-gray-200">Mail ID</label>
               <input
                 id="email"
                 name="email"

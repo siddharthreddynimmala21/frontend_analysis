@@ -1,18 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ChatMessage from './chat/ChatMessage';
 import ChatInput from './chat/ChatInput';
 import { sendMessage } from '../services/api';
-import ConfirmationDialog from './common/ConfirmationDialog';
 import Navigation from './common/Navigation';
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const { logout } = useAuth();
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleSendMessage = async (message) => {
     try {
@@ -110,17 +106,6 @@ export default function Chat() {
             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
           </div>
         </motion.div>
-
-        {showLogoutConfirm && (
-          <ConfirmationDialog
-            message="Are you sure you want to log out?"
-            onConfirm={() => {
-              logout();
-              setShowLogoutConfirm(false);
-            }}
-            onCancel={() => setShowLogoutConfirm(false)}
-          />
-        )}
       </div>
     </div>
   );

@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, Upload, Briefcase, GraduationCap, Code, FileText, Download } from 'lucide-react';
+import { Upload, Briefcase, GraduationCap, Code, FileText, Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import ConfirmationDialog from './common/ConfirmationDialog';
 import Navigation from './common/Navigation';
 import { uploadResume, analyzeResume } from '../services/api';
 import { useLocation } from 'react-router-dom';
 
 export default function ResumeAnalysis() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
   const initialType = location.state?.analysisType || 'ai';
   const [file, setFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState(null);
   const [analysisType, setAnalysisType] = useState(initialType); // 'ai' or 'text'

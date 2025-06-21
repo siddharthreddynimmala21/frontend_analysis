@@ -1,6 +1,12 @@
 import { motion } from 'framer-motion';
 
-export default function ConfirmationDialog({ message, onConfirm, onCancel }) {
+export default function ConfirmationDialog({ 
+  message, 
+  onConfirm, 
+  onCancel, 
+  confirmText = "Yes", 
+  cancelText = "Cancel" 
+}) {
   const backdropVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1 },
@@ -25,19 +31,19 @@ export default function ConfirmationDialog({ message, onConfirm, onCancel }) {
         variants={modalVariants}
         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
       >
-        <p className="text-lg text-white mb-6 text-center">{message}</p>
+        <div className="text-lg text-white mb-6 text-center">{message}</div>
         <div className="flex justify-center space-x-4">
           <button
             onClick={onCancel}
             className="px-6 py-2 rounded-lg text-white bg-white/10 hover:bg-white/20 transition-colors duration-300"
           >
-            Cancel
+            {cancelText}
           </button>
           <button
             onClick={onConfirm}
             className="px-6 py-2 rounded-lg text-white bg-red-500/80 hover:bg-red-500/100 transition-colors duration-300"
           >
-            Yes
+            {confirmText}
           </button>
         </div>
       </motion.div>

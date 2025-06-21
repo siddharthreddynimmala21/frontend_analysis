@@ -5,14 +5,10 @@ import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
-import VerifyOTP from './components/auth/VerifyOTP';
-import SetupPassword from './components/auth/SetupPassword';
 import Chat from './components/Chat';
 import Dashboard from './components/Dashboard';
 import ResumeAnalysis from './components/ResumeAnalysis';
 import ForgotPassword from './components/auth/ForgotPassword';
-import ResetOTP from './components/auth/ResetOTP';
-import ResetPassword from './components/auth/ResetPassword';
 
 function App() {
   return (
@@ -23,11 +19,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/verify-otp" element={<VerifyOTP />} />
-          <Route path="/setup-password" element={<SetupPassword />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-otp" element={<ResetOTP />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route
             path="/dashboard"
             element={
