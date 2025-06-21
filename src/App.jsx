@@ -8,6 +8,7 @@ import Register from './components/auth/Register';
 import Chat from './components/Chat';
 import Dashboard from './components/Dashboard';
 import ResumeAnalysis from './components/ResumeAnalysis';
+import UploadResume from './components/UploadResume';
 import ForgotPassword from './components/auth/ForgotPassword';
 
 function App() {
@@ -41,6 +42,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ResumeAnalysis />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/upload-resume"
+            element={
+              <ProtectedRoute>
+                <UploadResume />
               </ProtectedRoute>
             }
           />

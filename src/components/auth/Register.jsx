@@ -141,17 +141,17 @@ export default function Register() {
   );
 
   const renderEmailStep = () => (
-    <motion.div
+      <motion.div 
       variants={cardVariants}
-      initial="hidden"
-      animate="visible"
-    >
+        initial="hidden"
+        animate="visible"
+      >
       <div className="text-center space-y-4 px-8 pb-8 sm:px-10 sm:pb-10">
         <div className="mx-auto w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
           <UserPlus className="w-8 h-8 text-white" />
         </div>
         <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-          Create your account
+            Create your account
         </div>
         <div className="text-gray-600 dark:text-gray-300">
           Step 1: Enter your email address
@@ -161,23 +161,23 @@ export default function Register() {
         <form className="space-y-4" onSubmit={emailFormik.handleSubmit} autoComplete="on">
           <div className="space-y-2">
             <label htmlFor="email" className="text-gray-700 dark:text-gray-200">Email address</label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
               className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-purple-500 transition-all duration-200 appearance-none rounded-lg block w-full px-4 py-2 border text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none sm:text-base"
               placeholder="Enter your email"
               {...emailFormik.getFieldProps('email')}
-            />
+              />
             {emailFormik.touched.email && emailFormik.errors.email && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 flex items-center space-x-2 mt-1">
                 <AlertTriangle className="w-4 h-4 text-red-500" />
                 <span className="text-red-800 dark:text-red-200 text-sm">{emailFormik.errors.email}</span>
               </div>
-            )}
-          </div>
+              )}
+            </div>
           <button
             type="submit"
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition-all duration-200 text-white border-0 py-3 px-4 rounded-lg font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-base flex items-center justify-center"
@@ -261,10 +261,10 @@ export default function Register() {
               {resending ? 'Sending...' : 'Resend OTP'}
             </button>
           </div>
-          <button
-            type="submit"
+            <button
+              type="submit"
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition-all duration-200 text-white border-0 py-3 px-4 rounded-lg font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-base flex items-center justify-center"
-            disabled={loading}
+              disabled={loading}
           >
             {loading ? (
               <div className="flex items-center space-x-2">
@@ -362,7 +362,7 @@ export default function Register() {
           </button>
         </form>
       </div>
-    </motion.div>
+      </motion.div>
   );
 
   return (

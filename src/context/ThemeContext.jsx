@@ -1,19 +1,22 @@
-import { createContext, useContext, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
-  const theme = 'dark';
+  // Always use dark theme
+  const [theme, setTheme] = useState('dark');
 
   useEffect(() => {
+    // Always apply dark theme
     document.documentElement.classList.add('dark');
     document.documentElement.classList.remove('light');
     localStorage.setItem('theme', 'dark');
   }, []);
 
+  // Removed toggle functionality since we're always using dark theme
   const toggleTheme = () => {
-    // Theme is always dark, so this function does nothing.
-    // We keep it for any components that might still call it.
+    // No-op function to maintain API compatibility
+    return;
   };
 
   return (
