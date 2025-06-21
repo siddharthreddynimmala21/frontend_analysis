@@ -29,113 +29,159 @@ const AlertDescription = ({ children, className = '' }) => <div className={class
 const SkillMatchReportDisplay = ({ report }) => {
   if (!report) return null;
   
-  // Parse the report
-  const { percentage, matchingSkills, missingSkills, justification } = JSON.parse(report);
-  
-  return (
-    <div className="space-y-3 sm:space-y-4">
-      <div className="flex items-center space-x-3 sm:space-x-4">
-        <div className="relative w-16 h-16 sm:w-24 sm:h-24">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xl sm:text-2xl font-bold">{percentage}%</span>
-          </div>
-          <svg className="w-16 h-16 sm:w-24 sm:h-24" viewBox="0 0 100 100">
-            <circle
-              className="text-gray-200 dark:text-gray-700"
-              strokeWidth="10"
-              stroke="currentColor"
-              fill="transparent"
-              r="40"
-              cx="50"
-              cy="50"
-            />
-            <circle
-              className="text-blue-600 dark:text-blue-400"
-              strokeWidth="10"
-              strokeDasharray={`${percentage * 2.51} 251`}
-              strokeLinecap="round"
-              stroke="currentColor"
-              fill="transparent"
-              r="40"
-              cx="50"
-              cy="50"
-            />
-          </svg>
-        </div>
-        <div>
-          <h3 className="text-lg sm:text-xl font-semibold">Match Score</h3>
-          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Based on your skills and the job requirements</p>
-        </div>
-      </div>
+  try {
+    // Try to parse the report for structured display
+    let score = null, strengths = [], improvements = [], justification = '';
+    
+    // Try to extract info from the report string
+    if (typeof report === 'string') {
+      // Score
+      const scoreMatch = report.match(/skill match score:?\s*(\d{1,3})/i);
+      score = scoreMatch ? scoreMatch[1] : null;
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-        <div className="bg-green-50 dark:bg-green-900/20 p-3 sm:p-4 rounded-lg">
-          <h3 className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-400 mb-1 sm:mb-2">Matching Skills</h3>
-          <ul className="list-disc pl-4 sm:pl-5 space-y-0.5 sm:space-y-1 text-xs sm:text-sm">
-            {matchingSkills.map((skill, index) => (
-              <li key={index} className="text-gray-700 dark:text-gray-300">{skill}</li>
-            ))}
-          </ul>
+      // Strengths
+      const strengthsMatch = report.match(/strengths:?\s*([\s\S]*?)\n(?:areas for improvement|$)/i);
+      if (strengthsMatch) {
+        strengths = strengthsMatch[1].split(/\n/).map(s => s.trim().replace(/^-\s*/, '')).filter(Boolean);
+      }
+      
+      // Areas for improvement
+      const improvementsMatch = report.match(/areas for improvement:?\s*([\s\S]*?)\n(?:justification|$)/i);
+      if (improvementsMatch) {
+        improvements = improvementsMatch[1].split(/\n/).map(s => s.trim().replace(/^-\s*/, '')).filter(Boolean);
+      }
+      
+      // Justification
+      const justificationMatch = report.match(/justification:?\s*([\s\S]*)/i);
+      if (justificationMatch) {
+        justification = justificationMatch[1].trim();
+      }
+    }
+  
+    return (
+      <div className="space-y-3 sm:space-y-4">
+        {score && (
+          <div className="flex items-center space-x-3 sm:space-x-4">
+            <div className="relative w-16 h-16 sm:w-24 sm:h-24">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xl sm:text-2xl font-bold">{score}%</span>
+              </div>
+              <svg className="w-16 h-16 sm:w-24 sm:h-24" viewBox="0 0 100 100">
+                <circle
+                  className="text-gray-200 dark:text-gray-700"
+                  strokeWidth="10"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r="40"
+                  cx="50"
+                  cy="50"
+                />
+                <circle
+                  className="text-blue-600 dark:text-blue-400"
+                  strokeWidth="10"
+                  strokeDasharray={`${score * 2.51} 251`}
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r="40"
+                  cx="50"
+                  cy="50"
+                />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg sm:text-xl font-semibold">Match Score</h3>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Based on your skills and the job requirements</p>
+            </div>
+          </div>
+        )}
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+          {strengths.length > 0 && (
+            <div className="bg-green-50 dark:bg-green-900/20 p-3 sm:p-4 rounded-lg">
+              <h3 className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-400 mb-1 sm:mb-2">Strengths</h3>
+              <ul className="list-disc pl-4 sm:pl-5 space-y-0.5 sm:space-y-1 text-xs sm:text-sm">
+                {strengths.map((skill, index) => (
+                  <li key={index} className="text-gray-700 dark:text-gray-300">{skill}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {improvements.length > 0 && (
+            <div className="bg-amber-50 dark:bg-amber-900/20 p-3 sm:p-4 rounded-lg">
+              <h3 className="text-base sm:text-lg font-semibold text-amber-700 dark:text-amber-400 mb-1 sm:mb-2">Areas for Improvement</h3>
+              <ul className="list-disc pl-4 sm:pl-5 space-y-0.5 sm:space-y-1 text-xs sm:text-sm">
+                {improvements.map((skill, index) => (
+                  <li key={index} className="text-gray-700 dark:text-gray-300">{skill}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
         
-        <div className="bg-amber-50 dark:bg-amber-900/20 p-3 sm:p-4 rounded-lg">
-          <h3 className="text-base sm:text-lg font-semibold text-amber-700 dark:text-amber-400 mb-1 sm:mb-2">Missing Skills</h3>
-          <ul className="list-disc pl-4 sm:pl-5 space-y-0.5 sm:space-y-1 text-xs sm:text-sm">
-            {missingSkills.length > 0 ? (
-              missingSkills.map((skill, index) => (
-                <li key={index} className="text-gray-700 dark:text-gray-300">{skill}</li>
-              ))
-            ) : (
-              <li className="text-gray-700 dark:text-gray-300">No missing skills identified!</li>
-            )}
-          </ul>
-        </div>
+        {justification && (
+          <div className="bg-gray-50 dark:bg-gray-800/50 p-3 sm:p-4 rounded-lg">
+            <h3 className="text-base sm:text-lg font-semibold mb-1 sm:mb-2">Analysis</h3>
+            <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{justification}</p>
+          </div>
+        )}
+        
+        {/* Raw report fallback */}
+        {!score && !strengths.length && !improvements.length && (
+          <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 sm:p-4 text-xs sm:text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap overflow-x-auto">{report}</pre>
+        )}
       </div>
-      
-      <div className="bg-gray-50 dark:bg-gray-800/50 p-3 sm:p-4 rounded-lg">
-        <h3 className="text-base sm:text-lg font-semibold mb-1 sm:mb-2">Analysis</h3>
-        <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{justification}</p>
+    );
+  } catch (error) {
+    console.error('Error parsing skill match report:', error);
+    return (
+      <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg text-red-800 dark:text-red-200">
+        <h3 className="text-lg font-semibold mb-2">Error Displaying Report</h3>
+        <p>There was an error parsing the skill match report. Please try again or contact support.</p>
+        <pre className="mt-2 p-2 bg-red-100 dark:bg-red-800/30 rounded text-xs overflow-auto">{report}</pre>
       </div>
-    </div>
-  );
+    );
+  }
 };
 
 function RoleRelevanceReportDisplay({ report }) {
-  // Try to parse the report for structured display
-  let relevanceScore = null, strengths = [], improvements = [], justification = '';
-  
-  // Try to extract info from the report string
-  if (typeof report === 'string') {
-    // Relevance score
-    const scoreMatch = report.match(/relevance score:?\s*(\d{1,3})/i);
-    relevanceScore = scoreMatch ? scoreMatch[1] : null;
+  try {
+    // Try to parse the report for structured display
+    let score = null, strengths = [], improvements = [], justification = '';
     
-    // Strengths
-    const strengthsMatch = report.match(/strengths:?\s*([\s\S]*?)\n(?:areas for improvement|$)/i);
-    if (strengthsMatch) {
-      strengths = strengthsMatch[1].split(/\n/).map(s => s.trim()).filter(Boolean);
+    // Try to extract info from the report string
+    if (typeof report === 'string') {
+      // Score
+      const scoreMatch = report.match(/skill match score:?\s*(\d{1,3})/i);
+      score = scoreMatch ? scoreMatch[1] : null;
+      
+      // Strengths
+      const strengthsMatch = report.match(/strengths:?\s*([\s\S]*?)\n(?:areas for improvement|$)/i);
+      if (strengthsMatch) {
+        strengths = strengthsMatch[1].split(/\n/).map(s => s.trim().replace(/^-\s*/, '')).filter(Boolean);
+      }
+      
+      // Areas for improvement
+      const improvementsMatch = report.match(/areas for improvement:?\s*([\s\S]*?)\n(?:justification|$)/i);
+      if (improvementsMatch) {
+        improvements = improvementsMatch[1].split(/\n/).map(s => s.trim().replace(/^-\s*/, '')).filter(Boolean);
+      }
+      
+      // Justification
+      const justificationMatch = report.match(/justification:?\s*([\s\S]*)/i);
+      if (justificationMatch) {
+        justification = justificationMatch[1].trim();
+      }
     }
-    
-    // Areas for improvement
-    const improvementsMatch = report.match(/areas for improvement:?\s*([\s\S]*?)\n(?:justification|$)/i);
-    if (improvementsMatch) {
-      improvements = improvementsMatch[1].split(/\n/).map(s => s.trim()).filter(Boolean);
-    }
-    
-    // Justification
-    const justificationMatch = report.match(/justification:?\s*([\s\S]*)/i);
-    if (justificationMatch) {
-      justification = justificationMatch[1].trim();
-    }
-  }
   
   return (
     <div className="space-y-3 sm:space-y-4">
-      {relevanceScore && (
+      {score && (
         <div className="flex items-center space-x-3 sm:space-x-4">
           <div className="relative w-16 h-16 sm:w-24 sm:h-24">
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-xl sm:text-2xl font-bold">{relevanceScore}/100</span>
+              <span className="text-xl sm:text-2xl font-bold">{score}%</span>
             </div>
             <svg className="w-16 h-16 sm:w-24 sm:h-24" viewBox="0 0 100 100">
               <circle
@@ -150,7 +196,7 @@ function RoleRelevanceReportDisplay({ report }) {
               <circle
                 className="text-teal-600 dark:text-teal-400"
                 strokeWidth="10"
-                strokeDasharray={`${relevanceScore * 2.51} 251`}
+                strokeDasharray={`${score * 2.51} 251`}
                 strokeLinecap="round"
                 stroke="currentColor"
                 fill="transparent"
@@ -199,41 +245,52 @@ function RoleRelevanceReportDisplay({ report }) {
       )}
       
       {/* Raw report fallback */}
-      {!relevanceScore && !strengths.length && !improvements.length && (
+      {!score && !strengths.length && !improvements.length && (
         <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 sm:p-4 text-xs sm:text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap overflow-x-auto">{report}</pre>
       )}
     </div>
   );
+  } catch (error) {
+    console.error('Error parsing role relevance report:', error);
+    return (
+      <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg text-red-800 dark:text-red-200">
+        <h3 className="text-lg font-semibold mb-2">Error Displaying Report</h3>
+        <p>There was an error parsing the role relevance report. Please try again or contact support.</p>
+        <pre className="mt-2 p-2 bg-red-100 dark:bg-red-800/30 rounded text-xs overflow-auto">{report}</pre>
+      </div>
+    );
+  }
 }
 
 function ATSReportDisplay({ report, type }) {
-  // Try to parse the report for structured display
-  let score = null, strengths = [], improvements = [], justification = '';
-  
-  // Try to extract info from the report string
-  if (typeof report === 'string') {
-    // Score
-    const scoreMatch = report.match(/ats score:?\s*(\d{1,3})/i);
-    score = scoreMatch ? scoreMatch[1] : null;
+  try {
+    // Try to parse the report for structured display
+    let score = null, strengths = [], improvements = [], justification = '';
     
-    // Strengths
-    const strengthsMatch = report.match(/strengths:?\s*([\s\S]*?)\n(?:areas for improvement|$)/i);
-    if (strengthsMatch) {
-      strengths = strengthsMatch[1].split(/\n/).map(s => s.trim()).filter(Boolean);
+    // Try to extract info from the report string
+    if (typeof report === 'string') {
+      // Score
+      const scoreMatch = report.match(/ats score:?\s*(\d{1,3})/i);
+      score = scoreMatch ? scoreMatch[1] : null;
+      
+      // Strengths
+      const strengthsMatch = report.match(/strengths:?\s*([\s\S]*?)\n(?:areas for improvement|$)/i);
+      if (strengthsMatch) {
+        strengths = strengthsMatch[1].split(/\n/).map(s => s.trim()).filter(Boolean);
+      }
+      
+      // Areas for improvement
+      const improvementsMatch = report.match(/areas for improvement:?\s*([\s\S]*?)\n(?:justification|$)/i);
+      if (improvementsMatch) {
+        improvements = improvementsMatch[1].split(/\n/).map(s => s.trim()).filter(Boolean);
+      }
+      
+      // Justification
+      const justificationMatch = report.match(/justification:?\s*([\s\S]*)/i);
+      if (justificationMatch) {
+        justification = justificationMatch[1].trim();
+      }
     }
-    
-    // Areas for improvement
-    const improvementsMatch = report.match(/areas for improvement:?\s*([\s\S]*?)\n(?:justification|$)/i);
-    if (improvementsMatch) {
-      improvements = improvementsMatch[1].split(/\n/).map(s => s.trim()).filter(Boolean);
-    }
-    
-    // Justification
-    const justificationMatch = report.match(/justification:?\s*([\s\S]*)/i);
-    if (justificationMatch) {
-      justification = justificationMatch[1].trim();
-    }
-  }
   
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -312,6 +369,16 @@ function ATSReportDisplay({ report, type }) {
       )}
     </div>
   );
+  } catch (error) {
+    console.error('Error parsing ATS report:', error);
+    return (
+      <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg text-red-800 dark:text-red-200">
+        <h3 className="text-lg font-semibold mb-2">Error Displaying Report</h3>
+        <p>There was an error parsing the ATS report. Please try again or contact support.</p>
+        <pre className="mt-2 p-2 bg-red-100 dark:bg-red-800/30 rounded text-xs overflow-auto">{report}</pre>
+      </div>
+    );
+  }
 }
 
 export default function UploadResume() {
