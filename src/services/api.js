@@ -23,9 +23,9 @@ export const register = async (email) => {
     console.log('Attempting registration for:', email);
     console.log('API Base URL:', API_BASE_URL);
     
-  const response = await api.post('/api/auth/register', { email });
+    const response = await api.post('/api/auth/register', { email });
     console.log('Registration successful:', response.data);
-  return response.data;
+    return response.data;
   } catch (error) {
     console.error('Registration Error Details:', {
       message: error.message,
@@ -57,9 +57,9 @@ export const login = async (email, password) => {
     console.log('Attempting login for:', email);
     console.log('API Base URL:', API_BASE_URL);
     
-  const response = await api.post('/api/auth/login', { email, password });
+    const response = await api.post('/api/auth/login', { email, password });
     console.log('Login successful:', response.data);
-  return response.data;
+    return response.data;
   } catch (error) {
     console.error('Login Error Details:', {
       message: error.message,
