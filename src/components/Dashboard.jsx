@@ -42,7 +42,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {/* AI Chat Card */}
             <motion.div
-              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/20 transition-all duration-300 cursor-pointer"
+              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/20 transition-all duration-100 cursor-pointer"
               variants={cardVariants}
               initial="hidden"
               animate="visible"
@@ -61,7 +61,7 @@ export default function Dashboard() {
 
             {/* AI Resume Analysis Card */}
             <motion.div
-              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/20 transition-all duration-300 cursor-pointer"
+              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/20 transition-all duration-100 cursor-pointer"
               variants={cardVariants}
               initial="hidden"
               animate="visible"
