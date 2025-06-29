@@ -31,6 +31,7 @@ export default function Navigation({ showBack = false }) {
             <div className="w-7 h-7 sm:w-10 sm:h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
               <div className="w-3 h-3 sm:w-5 sm:h-5 bg-white rounded-md transform rotate-12"></div>
             </div>
+            
           </div>
           <span className="text-lg sm:text-2xl font-semibold tracking-tight">ResumeRefiner Pro+</span>
         </div>

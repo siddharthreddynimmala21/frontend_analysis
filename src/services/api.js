@@ -43,12 +43,61 @@ export const resendOTP = async (email) => {
   return response.data;
 };
 
-export const sendMessage = async (prompt) => {
+// RAG-based chat functions
+export const uploadResumeForChat = async (formData) => {
+  try {
+    const response = await api.post('/api/chat/upload-resume', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading resume for chat:', error);
+    throw error;
+  }
+};
+
+export const sendMessage = async (question, conversationHistory = []) => {
+  try {
+    const response = await api.post('/api/chat/query', { 
+      question,
+      conversationHistory 
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending message:', error);
+    throw error;
+  }
+};
+
+export const checkHasResume = async () => {
+  try {
+    const response = await api.get('/api/chat/has-resume');
+    return response.data;
+  } catch (error) {
+    console.error('Error checking resume:', error);
+    throw error;
+  }
+};
+
+export const deleteResumeData = async () => {
+  try {
+    const response = await api.delete('/api/chat/resume-data');
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting resume data:', error);
+    throw error;
+  }
+};
+
+// Legacy chat function (for basic AI chat without RAG)
+export const sendBasicMessage = async (prompt) => {
   try {
     const response = await api.post('/api/chat', { prompt });
     return response.data;
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error('Error sending basic message:', error);
     throw error;
   }
 };
