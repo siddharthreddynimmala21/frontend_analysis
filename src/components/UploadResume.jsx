@@ -526,7 +526,22 @@ export default function UploadResume() {
         setIsWorkExpLoading(false);
       }
     } catch (err) {
-      setError(err.message || 'An error occurred while analyzing your resume.');
+      console.error('Resume analysis error:', err);
+      
+      // Provide more specific error messages
+      let errorMessage = 'An error occurred while analyzing your resume.';
+      
+      if (err.message.includes('Failed to upload resume')) {
+        errorMessage = 'Resume upload failed. Please check your file and try again. If the issue persists, your resume may have been uploaded successfully - please refresh the page to check.';
+      } else if (err.message.includes('network') || err.message.includes('fetch')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (err.message.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again with a smaller file or better connection.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsProcessing(false);
     }

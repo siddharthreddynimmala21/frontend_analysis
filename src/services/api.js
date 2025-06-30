@@ -310,6 +310,105 @@ export const matchResumeSkills = async (formData) => {
   }
 };
 
+// Chat History Management API Functions
+
+/**
+ * Save chat history to the database
+ * @param {Object} chatData - { chatId, resumeId, chatName, messages }
+ * @returns {Promise<Object>} Success response
+ */
+export const saveChatHistory = async (chatData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/chat/history`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(chatData)
+    });
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || 'Failed to save chat history');
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Get chat history from the database
+ * @param {string} chatId - Chat ID
+ * @returns {Promise<Array>} Array of messages
+ */
+export const getChatHistory = async (chatId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/chat/history/${chatId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || 'Failed to get chat history');
+    }
+    return data.messages || [];
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Get user's chat sessions
+ * @returns {Promise<Array>} Array of chat sessions
+ */
+export const getChatSessions = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/chat/sessions`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || 'Failed to get chat sessions');
+    }
+    return data.sessions || [];
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Delete chat history
+ * @param {string} chatId - Chat ID
+ * @returns {Promise<Object>} Success response
+ */
+export const deleteChatHistory = async (chatId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/chat/history/${chatId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || 'Failed to delete chat history');
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 /**
  * Generate a job description using Gemini based on experience, role, and company
  * @param {Object} params - { experience, role, company }

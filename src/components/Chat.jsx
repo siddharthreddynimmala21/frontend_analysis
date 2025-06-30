@@ -7,7 +7,11 @@ import {
   sendMessage, 
   uploadResumeForChat, 
   getResumesForChat, 
-  deleteResumeForChat 
+  deleteResumeForChat,
+  saveChatHistory,
+  getChatHistory,
+  getChatSessions,
+  deleteChatHistory
 } from '../services/api';
 import Navigation from './common/Navigation';
 import { Upload, FileText, Trash2, AlertCircle, ChevronDown, Plus, MessageSquare, Menu, X } from 'lucide-react';
@@ -42,10 +46,9 @@ export default function Chat() {
     }
   }, [user, currentChatId]);
 
-  // Save chat history to localStorage whenever messages change
+  // Save chat history to database whenever messages change
   useEffect(() => {
     if (user && currentChatId && messages.length > 0) {
-      saveChatHistory();
       updateChatSession();
     }
   }, [messages, user, currentChatId]);
@@ -69,50 +72,87 @@ export default function Chat() {
     }
   };
 
-  const loadChatSessions = () => {
+  const loadChatSessions = async () => {
     if (user) {
-      const savedSessions = localStorage.getItem(`chat_sessions_${user.id}`);
-      if (savedSessions) {
-        try {
-          const parsedSessions = JSON.parse(savedSessions);
-          setChatSessions(parsedSessions);
-          
-          // Load the most recent chat if no current chat is selected
-          if (!currentChatId && parsedSessions.length > 0) {
-            setCurrentChatId(parsedSessions[0].id);
-            setSelectedResumeId(parsedSessions[0].resumeId);
+      try {
+        const sessions = await getChatSessions();
+        setChatSessions(sessions);
+        
+        // Load the most recent chat if no current chat is selected
+        if (!currentChatId && sessions.length > 0) {
+          setCurrentChatId(sessions[0].id);
+          setSelectedResumeId(sessions[0].resumeId);
+        }
+      } catch (error) {
+        console.error('Error loading chat sessions:', error);
+        // Fallback to localStorage for backward compatibility
+        const savedSessions = localStorage.getItem(`chat_sessions_${user.id}`);
+        if (savedSessions) {
+          try {
+            const parsedSessions = JSON.parse(savedSessions);
+            setChatSessions(parsedSessions);
+            
+            if (!currentChatId && parsedSessions.length > 0) {
+              setCurrentChatId(parsedSessions[0].id);
+              setSelectedResumeId(parsedSessions[0].resumeId);
+            }
+          } catch (parseError) {
+            console.error('Error parsing localStorage sessions:', parseError);
           }
-        } catch (error) {
-          console.error('Error loading chat sessions:', error);
         }
       }
     }
   };
 
-  const loadChatHistory = () => {
+  const loadChatHistory = async () => {
     if (user && currentChatId) {
-      const savedHistory = localStorage.getItem(`chat_history_${user.id}_${currentChatId}`);
-      if (savedHistory) {
-        try {
-          const parsedHistory = JSON.parse(savedHistory);
-          setMessages(parsedHistory);
-        } catch (error) {
-          console.error('Error loading chat history:', error);
+      try {
+        const messages = await getChatHistory(currentChatId);
+        setMessages(messages);
+      } catch (error) {
+        console.error('Error loading chat history from database:', error);
+        // Fallback to localStorage for backward compatibility
+        const savedHistory = localStorage.getItem(`chat_history_${user.id}_${currentChatId}`);
+        if (savedHistory) {
+          try {
+            const parsedHistory = JSON.parse(savedHistory);
+            setMessages(parsedHistory);
+          } catch (parseError) {
+            console.error('Error parsing localStorage history:', parseError);
           setMessages([]);
         }
       } else {
         setMessages([]);
       }
     }
+  }
   };
 
-  const saveChatHistory = () => {
-    if (user && currentChatId && messages.length > 0) {
-      localStorage.setItem(`chat_history_${user.id}_${currentChatId}`, JSON.stringify(messages));
+  const saveChatHistoryToDatabase = async () => {
+    if (user && currentChatId && selectedResumeId && messages.length > 0) {
+      try {
+        const currentSession = chatSessions.find(session => session.id === currentChatId);
+        const chatName = currentSession ? currentSession.name : `Chat ${new Date().toLocaleDateString()}`;
+        
+        await saveChatHistory({
+          chatId: currentChatId,
+          resumeId: selectedResumeId,
+          chatName: chatName,
+          messages: messages.map(msg => ({
+            text: msg.text,
+            isBot: msg.isBot,
+            timestamp: msg.timestamp || new Date()
+          }))
+        });
+      } catch (error) {
+        console.error('Error saving chat history to database:', error);
+        // Fallback to localStorage
+        localStorage.setItem(`chat_history_${user.id}_${currentChatId}`, JSON.stringify(messages));
+      }
     }
   };
 
-  const updateChatSession = () => {
+  const updateChatSession = async () => {
     if (user && currentChatId && messages.length > 0) {
       const updatedSessions = chatSessions.map(session => {
         if (session.id === currentChatId) {
@@ -121,12 +161,18 @@ export default function Chat() {
             ...session,
             lastMessage: lastMessage.text.substring(0, 50) + (lastMessage.text.length > 50 ? '...' : ''),
             messageCount: messages.length,
+            lastActivity: new Date(),
             updatedAt: new Date().toISOString()
           };
         }
         return session;
       });
       setChatSessions(updatedSessions);
+      
+      // Save to database
+      await saveChatHistoryToDatabase();
+      
+      // Keep localStorage as backup
       localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
     }
   };
@@ -172,11 +218,21 @@ export default function Chat() {
     }
   };
 
-  const deleteChat = (chatId) => {
+  const deleteChat = async (chatId) => {
     if (!window.confirm("Delete this chat?")) return;
     
+    try {
+      // Delete from database
+      await deleteChatHistory(chatId);
+    } catch (error) {
+      console.error('Error deleting chat from database:', error);
+    }
+    
+    // Update local state
     const updatedSessions = chatSessions.filter(s => s.id !== chatId);
     setChatSessions(updatedSessions);
+    
+    // Clean up localStorage as backup
     localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
     localStorage.removeItem(`chat_history_${user.id}_${chatId}`);
     
