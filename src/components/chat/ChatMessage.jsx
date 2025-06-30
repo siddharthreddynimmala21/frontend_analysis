@@ -1,12 +1,12 @@
 const ChatMessage = ({ message, isBot }) => {
   const botAvatar = (
-    <div className="w-8 h-8 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center shadow-md">
+    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center shadow-md">
       <div className="w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-sm transform rotate-12"></div>
     </div>
   );
 
   const userAvatar = (
-    <div className="w-8 h-8 sm:w-8 sm:h-8 rounded-full bg-cyan-500/50 flex-shrink-0"></div>
+    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-cyan-500/50 flex-shrink-0"></div>
   );
 
   return (

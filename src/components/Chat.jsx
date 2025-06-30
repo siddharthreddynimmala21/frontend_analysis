@@ -22,6 +22,7 @@ export default function Chat() {
   const [selectedResumeId, setSelectedResumeId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const [chatSessions, setChatSessions] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -259,6 +260,7 @@ export default function Chat() {
   };
 
   const handleDeleteResume = async (resumeId) => {
+    setDeleteError(''); // Clear any previous delete errors
     const resumeToDelete = resumes.find(r => r.id === resumeId);
     if (!resumeToDelete) return;
 
@@ -300,7 +302,9 @@ export default function Chat() {
       
     } catch (error) {
       console.error('Error deleting resume:', error);
-      alert(`Failed to delete resume "${resumeToDelete.fileName}". Please try again.`);
+      setDeleteError(`Failed to delete resume "${resumeToDelete.fileName}". Please try again.`);
+    } finally {
+      await loadResumes(); // Ensure resumes are reloaded after delete attempt
     }
   };
 
@@ -386,7 +390,7 @@ export default function Chat() {
   return (
     <div className="flex h-screen bg-gray-900 text-white relative">
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-gray-800 p-4 border-r border-gray-700 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 lg:w-1/4 transition-transform duration-300 ease-in-out`}>
+      <div className={`fixed inset-y-0 left-0 w-64 bg-gray-800 p-4 border-r border-gray-700 transform ${sidebarOpen ? 'translate-x-0 z-50' : '-translate-x-full z-40'} lg:relative lg:translate-x-0 lg:w-1/4 transition-transform duration-300 ease-in-out`}>
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
           <div className="p-4 border-b border-white/20">
@@ -492,8 +496,16 @@ export default function Chat() {
                 </div>
               ))}
               {uploadError && (
-                <div className="mt-2 text-red-400 text-xs">
+                <div className="mt-2 text-red-500 text-sm flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-1" />
                   {uploadError}
+                </div>
+              )}
+
+              {deleteError && (
+                <div className="mt-2 text-red-500 text-sm flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  {deleteError}
                 </div>
               )}
             </div>
@@ -501,24 +513,30 @@ export default function Chat() {
         </div>
 
         {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col pt-16 sm:pt-20 lg:ml-1/4">
+      <div className="flex-1 flex flex-col pt-16 sm:pt-20 lg:ml-1/4 relative">
+        {/* Overlay for mobile when sidebar is open */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          ></div>
+        )}
         {/* Navigation Bar */}
-        <Navigation />
+        <Navigation setSidebarOpen={setSidebarOpen} />
         
         {/* Mobile Sidebar Toggle */}
-        <div className="lg:hidden p-4">
+        {/* <div className="lg:hidden p-2">
           <button
-            onClick={() => setSidebarOpen(true)}
-            className="flex items-center space-x-2 p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-            <span>Chat History</span>
-          </button>
-        </div>
+              onClick={() => setSidebarOpen(true)}
+              className="flex items-center space-x-1 p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+        </div> */}
         
-        <div className="flex-1 flex flex-col px-4">
+        <div className="flex-1 flex flex-col px-2 sm:px-4 md:mt-8">
           <motion.div 
-            className="w-full max-w-4xl mx-auto flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-white/20 h-[calc(100vh-8rem)]"
+            className="w-[95vw] max-w-5xl mx-auto flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-white/20 h-[calc(100vh-5rem)] lg:h-[calc(100vh-8rem)]"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
@@ -528,15 +546,15 @@ export default function Chat() {
             <div className="p-4 border-b border-white/20 bg-white/5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <h1 className="text-xl font-bold text-white">RAG Resume Chat</h1>
+                  <h1 className="text-xl font-bold text-white whitespace-nowrap">Chat with AI</h1>
                   {currentChatId && (
                     <div className="text-sm text-gray-400">
-                      {messages.length}/{MAX_MESSAGES_PER_CHAT} messages
+                      {messages.length}/{MAX_MESSAGES_PER_CHAT}
                     </div>
                   )}
                 </div>
                 {selectedResumeId && (
-                  <div className="text-sm text-green-400">
+                  <div className="text-xs text-green-400">
                     {resumes.find(r => r.id === selectedResumeId)?.fileName.substring(0, 20)}
                     {resumes.find(r => r.id === selectedResumeId)?.fileName.length > 20 ? '...' : ''}
                   </div>
