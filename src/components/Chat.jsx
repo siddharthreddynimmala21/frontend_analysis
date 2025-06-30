@@ -16,7 +16,7 @@ import {
 import Navigation from './common/Navigation';
 import { Upload, FileText, Trash2, AlertCircle, ChevronDown, Plus, MessageSquare, Menu, X } from 'lucide-react';
 
-const MAX_MESSAGES_PER_CHAT = 20;
+const MAX_USER_MESSAGES_PER_CHAT = 10; // Only count user messages, not bot responses
 
 export default function Chat() {
   const { user } = useAuth();
@@ -38,6 +38,13 @@ export default function Chat() {
       loadChatSessions();
     }
   }, [user]);
+  
+  // Reload chat sessions when user changes
+  useEffect(() => {
+    if (user) {
+      loadChatSessions();
+    }
+  }, [user?.id]);
 
   // Load chat history when current chat changes
   useEffect(() => {
@@ -49,9 +56,15 @@ export default function Chat() {
   // Save chat history to database whenever messages change
   useEffect(() => {
     if (user && currentChatId && messages.length > 0) {
-      updateChatSession();
+      // Use a debounce to avoid too many saves
+      const saveTimeout = setTimeout(() => {
+        saveChatHistoryToDatabase();
+        updateChatSession();
+      }, 1000);
+      
+      return () => clearTimeout(saveTimeout);
     }
-  }, [messages, user, currentChatId]);
+  }, [messages, user, currentChatId, selectedResumeId]);
 
   const loadResumes = async () => {
     try {
@@ -107,8 +120,32 @@ export default function Chat() {
   const loadChatHistory = async () => {
     if (user && currentChatId) {
       try {
-        const messages = await getChatHistory(currentChatId);
-        setMessages(messages);
+        console.log('Loading chat history for chat ID:', currentChatId);
+        const history = await getChatHistory(currentChatId);
+        if (history && history.length > 0) {
+          console.log('Chat history loaded from database:', history.length, 'messages');
+          setMessages(history);
+          
+          // Find the chat session to get the resumeId
+          const session = chatSessions.find(s => s.id === currentChatId);
+          if (session && session.resumeId) {
+            setSelectedResumeId(session.resumeId);
+          }
+        } else {
+          console.log('No chat history found in database');
+          setMessages([]);
+          
+          // Fallback to localStorage for backward compatibility
+          const savedHistory = localStorage.getItem(`chat_history_${user.id}_${currentChatId}`);
+          if (savedHistory) {
+            try {
+              const parsedHistory = JSON.parse(savedHistory);
+              setMessages(parsedHistory);
+            } catch (parseError) {
+              console.error('Error parsing localStorage history:', parseError);
+            }
+          }
+        }
       } catch (error) {
         console.error('Error loading chat history from database:', error);
         // Fallback to localStorage for backward compatibility
@@ -119,24 +156,36 @@ export default function Chat() {
             setMessages(parsedHistory);
           } catch (parseError) {
             console.error('Error parsing localStorage history:', parseError);
+            setMessages([]);
+          }
+        } else {
           setMessages([]);
         }
-      } else {
-        setMessages([]);
       }
+    } else {
+      setMessages([]);
     }
-  }
   };
 
   const saveChatHistoryToDatabase = async () => {
     if (user && currentChatId && selectedResumeId && messages.length > 0) {
       try {
+        console.log('Saving chat history to database for chat ID:', currentChatId);
         const currentSession = chatSessions.find(session => session.id === currentChatId);
         const chatName = currentSession ? currentSession.name : `Chat ${new Date().toLocaleDateString()}`;
         
+        // Ensure the selected resume exists in the resumes array
+        const resumeExists = resumes.some(resume => resume.id === selectedResumeId);
+        if (!resumeExists && resumes.length > 0) {
+          console.warn('Selected resume not found, using first available resume');
+          setSelectedResumeId(resumes[0].id);
+        }
+        
+        const finalResumeId = resumeExists ? selectedResumeId : (resumes.length > 0 ? resumes[0].id : selectedResumeId);
+        
         await saveChatHistory({
           chatId: currentChatId,
-          resumeId: selectedResumeId,
+          resumeId: finalResumeId,
           chatName: chatName,
           messages: messages.map(msg => ({
             text: msg.text,
@@ -144,9 +193,19 @@ export default function Chat() {
             timestamp: msg.timestamp || new Date()
           }))
         });
+        console.log('Chat history saved to database successfully');
+        
+        // Update local storage as backup
+        localStorage.setItem(`chat_history_${user.id}_${currentChatId}`, JSON.stringify(messages));
       } catch (error) {
         console.error('Error saving chat history to database:', error);
         // Fallback to localStorage
+        localStorage.setItem(`chat_history_${user.id}_${currentChatId}`, JSON.stringify(messages));
+      }
+    } else {
+      console.warn('Cannot save chat history: missing user, chatId, resumeId, or messages');
+      if (user && currentChatId && messages.length > 0) {
+        // Save to localStorage if we have at least user, chatId and messages
         localStorage.setItem(`chat_history_${user.id}_${currentChatId}`, JSON.stringify(messages));
       }
     }
@@ -179,42 +238,113 @@ export default function Chat() {
 
   const createNewChat = () => {
     if (!selectedResumeId) {
-      alert('Please select a resume first');
+      // Check if we have any resumes available
+      if (resumes.length > 0) {
+        setSelectedResumeId(resumes[0].id);
+      } else {
+        alert('Please upload a resume first');
+        return;
+      }
+    }
+
+    // Ensure the selected resume exists in the resumes array
+    const resumeExists = resumes.some(resume => resume.id === selectedResumeId);
+    const finalResumeId = resumeExists ? selectedResumeId : (resumes.length > 0 ? resumes[0].id : null);
+    
+    if (!finalResumeId) {
+      alert('Please upload a resume first');
       return;
     }
 
     const newChatId = `chat_${Date.now()}`;
-    const selectedResume = resumes.find(r => r.id === selectedResumeId);
+    const selectedResume = resumes.find(r => r.id === finalResumeId);
     
     const newSession = {
       id: newChatId,
-      resumeId: selectedResumeId,
+      resumeId: finalResumeId,
       resumeName: selectedResume?.fileName || 'Unknown Resume',
-      title: `Chat with ${selectedResume?.fileName || 'Resume'}`,
+      name: `Chat with ${selectedResume?.fileName || 'Resume'}`,
       lastMessage: '',
       messageCount: 0,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      lastActivity: new Date()
     };
 
     const updatedSessions = [newSession, ...chatSessions];
     setChatSessions(updatedSessions);
+    
+    // Save to localStorage as backup
     localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
+    localStorage.setItem(`chat_selected_resume_${user.id}`, finalResumeId);
     
     setCurrentChatId(newChatId);
-    setMessages([{
-      text: "Hello! How can I help you?",
+    setSelectedResumeId(finalResumeId);
+    
+    const initialMessage = {
+      text: `Hello! I'm ready to help you with your resume: ${selectedResume?.fileName || 'Resume'}. What would you like to know?`,
       isBot: true,
-      isSystem: true
-    }]);
+      isSystem: true,
+      timestamp: new Date()
+    };
+    
+    setMessages([initialMessage]);
+    
+    // Save this initial chat to the database
+    setTimeout(() => {
+      saveChatHistoryToDatabase();
+    }, 500);
   };
 
-  const switchToChat = (chatId) => {
+  const switchToChat = async (chatId) => {
     const session = chatSessions.find(s => s.id === chatId);
     if (session) {
+      // Save current chat before switching
+      if (currentChatId && messages.length > 0) {
+        await saveChatHistoryToDatabase();
+      }
+      
+      // Update selected resume ID
+      const resumeExists = resumes.some(resume => resume.id === session.resumeId);
+      if (resumeExists) {
+        setSelectedResumeId(session.resumeId);
+        localStorage.setItem(`chat_selected_resume_${user.id}`, session.resumeId);
+      } else if (resumes.length > 0) {
+        // If the resume doesn't exist anymore, use the first available one
+        setSelectedResumeId(resumes[0].id);
+        localStorage.setItem(`chat_selected_resume_${user.id}`, resumes[0].id);
+      }
+      
+      // Switch to the new chat
       setCurrentChatId(chatId);
-      setSelectedResumeId(session.resumeId);
       setSidebarOpen(false);
+      
+      // Load chat history for the new chat
+      try {
+        const history = await getChatHistory(chatId);
+        if (history && history.length > 0) {
+          setMessages(history);
+        } else {
+          // If no history is found, initialize with a welcome message
+          const selectedResume = resumes.find(r => resumeExists ? r.id === session.resumeId : r.id === resumes[0].id);
+          setMessages([{
+            text: `Hello! I'm ready to help you with your resume: ${selectedResume?.fileName || 'Resume'}. What would you like to know?`,
+            isBot: true,
+            isSystem: true,
+            timestamp: new Date()
+          }]);
+        }
+      } catch (error) {
+        console.error('Error loading chat history when switching chats:', error);
+        // Initialize with a welcome message if there's an error
+        const selectedResume = resumes.find(r => resumeExists ? r.id === session.resumeId : r.id === resumes[0].id);
+        setMessages([{
+          text: `Hello! I'm ready to help you with your resume: ${selectedResume?.fileName || 'Resume'}. What would you like to know?`,
+          isBot: true,
+          isSystem: true,
+          timestamp: new Date()
+        }]);
+      }
     }
   };
 
@@ -224,6 +354,7 @@ export default function Chat() {
     try {
       // Delete from database
       await deleteChatHistory(chatId);
+      console.log('Chat deleted from database successfully');
     } catch (error) {
       console.error('Error deleting chat from database:', error);
     }
@@ -238,11 +369,35 @@ export default function Chat() {
     
     if (currentChatId === chatId) {
       if (updatedSessions.length > 0) {
-        setCurrentChatId(updatedSessions[0].id);
-        setSelectedResumeId(updatedSessions[0].resumeId);
+        // Switch to the first available chat
+        const nextChat = updatedSessions[0];
+        setCurrentChatId(nextChat.id);
+        
+        // Ensure the resume exists
+        const resumeExists = resumes.some(resume => resume.id === nextChat.resumeId);
+        if (resumeExists) {
+          setSelectedResumeId(nextChat.resumeId);
+        } else if (resumes.length > 0) {
+          // If the resume doesn't exist anymore, use the first available one
+          setSelectedResumeId(resumes[0].id);
+        }
+        
+        // Load the chat history for the next chat
+        loadChatHistory();
       } else {
+        // No more chats available
         setCurrentChatId(null);
         setMessages([]);
+        
+        // If there are resumes available, prompt to create a new chat
+        if (resumes.length > 0) {
+          setSelectedResumeId(resumes[0].id);
+          setTimeout(() => {
+            if (window.confirm('Would you like to start a new chat with your resume?')) {
+              createNewChat();
+            }
+          }, 500);
+        }
       }
     }
   };
@@ -260,6 +415,9 @@ export default function Chat() {
       setUploadError('File size must be less than 10MB.');
       return;
     }
+    
+    // Clear previous errors
+    setUploadError('');
 
     if (resumes.length >= 3) {
       setUploadError('Maximum 3 resumes allowed. Please delete an existing resume first.');
@@ -281,17 +439,20 @@ export default function Chat() {
       // Select the newly uploaded resume and create a new chat
       if (result.resume) {
         setSelectedResumeId(result.resume.id);
+        localStorage.setItem(`chat_selected_resume_${user.id}`, result.resume.id);
+        
         // Create new chat with the uploaded resume
         const newChatId = `chat_${Date.now()}`;
         const newSession = {
           id: newChatId,
           resumeId: result.resume.id,
           resumeName: result.resume.fileName,
-          title: `Chat with ${result.resume.fileName}`,
+          name: `Chat with ${result.resume.fileName}`,
           lastMessage: '',
           messageCount: 0,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          lastActivity: new Date()
         };
 
         const updatedSessions = [newSession, ...chatSessions];
@@ -299,11 +460,20 @@ export default function Chat() {
         localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
         
         setCurrentChatId(newChatId);
-        setMessages([{
-          text: "Hello! How can I help you?",
+        
+        const initialMessage = {
+          text: `Hello! I'm ready to help you with your resume: ${result.resume.fileName}. What would you like to know?`,
           isBot: true,
-          isSystem: true
-        }]);
+          isSystem: true,
+          timestamp: new Date()
+        };
+        
+        setMessages([initialMessage]);
+        
+        // Save this initial chat to the database
+        setTimeout(() => {
+          saveChatHistoryToDatabase();
+        }, 500);
       }
     } catch (error) {
       console.error('Error uploading resume:', error);
@@ -347,12 +517,44 @@ export default function Chat() {
       const currentSession = chatSessions.find(s => s.id === currentChatId);
       if (currentSession && currentSession.resumeId === resumeId) {
         if (updatedSessions.length > 0) {
-          setCurrentChatId(updatedSessions[0].id);
-          setSelectedResumeId(updatedSessions[0].resumeId);
-        } else {
+          // Switch to another chat
+          const nextChat = updatedSessions[0];
+          setCurrentChatId(nextChat.id);
+          setSelectedResumeId(nextChat.resumeId);
+          localStorage.setItem(`chat_selected_resume_${user.id}`, nextChat.resumeId);
+          
+          // Load the chat history for the next chat
+          setTimeout(() => {
+            loadChatHistory();
+          }, 100);
+        } else if (updatedResumes.length > 0) {
+          // No chats left, but we have resumes - create a new chat
           setCurrentChatId(null);
-          setSelectedResumeId(updatedResumes.length > 0 ? updatedResumes[0].id : null);
+          setSelectedResumeId(updatedResumes[0].id);
+          localStorage.setItem(`chat_selected_resume_${user.id}`, updatedResumes[0].id);
           setMessages([]);
+          
+          // Prompt to create a new chat
+          setTimeout(() => {
+            if (window.confirm('Would you like to start a new chat with your remaining resume?')) {
+              createNewChat();
+            }
+          }, 500);
+        } else {
+          // No resumes left
+          setCurrentChatId(null);
+          setSelectedResumeId(null);
+          localStorage.removeItem(`chat_selected_resume_${user.id}`);
+          setMessages([]);
+        }
+      } else if (selectedResumeId === resumeId) {
+        // If selected resume was deleted but not the current chat
+        if (updatedResumes.length > 0) {
+          setSelectedResumeId(updatedResumes[0].id);
+          localStorage.setItem(`chat_selected_resume_${user.id}`, updatedResumes[0].id);
+        } else {
+          setSelectedResumeId(null);
+          localStorage.removeItem(`chat_selected_resume_${user.id}`);
         }
       }
       
@@ -378,9 +580,12 @@ export default function Chat() {
       return;
     }
 
-    // Check message limit
-    if (messages.length >= MAX_MESSAGES_PER_CHAT) {
-      if (window.confirm(`You've reached the limit of ${MAX_MESSAGES_PER_CHAT} messages per chat. Would you like to start a new chat?`)) {
+    // Count only user messages for the limit check
+    const userMessageCount = messages.filter(msg => !msg.isBot).length;
+    
+    // Check user message limit
+    if (userMessageCount >= MAX_USER_MESSAGES_PER_CHAT) {
+      if (window.confirm(`You've reached the limit of ${MAX_USER_MESSAGES_PER_CHAT} user messages per chat. Would you like to start a new chat?`)) {
         createNewChat();
       }
       return;
@@ -395,6 +600,12 @@ export default function Chat() {
         role: msg.isBot ? 'assistant' : 'user',
         content: msg.text
       }));
+      
+      // Ensure the selected resume exists in the resumes array
+      const resumeExists = resumes.some(resume => resume.id === selectedResumeId);
+      if (!resumeExists) {
+        throw new Error('Please upload your resume first');
+      }
       
       const response = await sendMessage(message, recentMessages, selectedResumeId);
       setMessages(prev => [...prev, { 
@@ -605,7 +816,7 @@ export default function Chat() {
                   <h1 className="text-xl font-bold text-white whitespace-nowrap">Chat with AI</h1>
                   {currentChatId && (
                     <div className="text-sm text-gray-400">
-                      {messages.length}/{MAX_MESSAGES_PER_CHAT}
+                      {messages.filter(msg => !msg.isBot).length}/{MAX_USER_MESSAGES_PER_CHAT}
                     </div>
                   )}
                 </div>
