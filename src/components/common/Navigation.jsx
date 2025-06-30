@@ -24,7 +24,7 @@ export default function Navigation({ showBack = false }) {
 
   return (
     <>
-      <nav className="fixed top-2 sm:top-6 left-1/2 transform -translate-x-1/2 z-50 w-[95vw] max-w-5xl flex items-center justify-between px-3 sm:px-6 py-2 sm:py-3 rounded-2xl bg-white/20 dark:bg-white/10 backdrop-blur-2xl border border-white/30 shadow-2xl transition-all duration-300">
+      <nav className="fixed top-2 sm:top-6 left-1/2 transform -translate-x-1/2 z-50 w-[95vw] sm:w-[70vw] max-w-5xl flex items-center justify-between px-3 sm:px-6 py-2 sm:py-3 rounded-2xl bg-white/20 dark:bg-white/10 backdrop-blur-2xl border border-white/30 shadow-2xl transition-all duration-300">
         {/* Left: Logo and App Name */}
         <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer select-none" onClick={() => navigate('/dashboard')}>
           <div className="w-8 h-8 sm:w-12 sm:h-12 flex items-center justify-center">

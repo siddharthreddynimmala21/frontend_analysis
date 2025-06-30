@@ -58,11 +58,34 @@ export const uploadResumeForChat = async (formData) => {
   }
 };
 
-export const sendMessage = async (question, conversationHistory = []) => {
+// Get all user resumes
+export const getResumesForChat = async () => {
+  try {
+    const response = await api.get('/api/chat/resumes');
+    return response.data;
+  } catch (error) {
+    console.error('Error getting resumes for chat:', error);
+    throw error;
+  }
+};
+
+// Delete a specific resume
+export const deleteResumeForChat = async (resumeId) => {
+  try {
+    const response = await api.delete(`/api/chat/resumes/${resumeId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting resume for chat:', error);
+    throw error;
+  }
+};
+
+export const sendMessage = async (question, conversationHistory = [], resumeId) => {
   try {
     const response = await api.post('/api/chat/query', { 
       question,
-      conversationHistory 
+      conversationHistory,
+      resumeId
     });
     return response.data;
   } catch (error) {
