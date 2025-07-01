@@ -480,13 +480,29 @@ export default function Chat() {
       const formData = new FormData();
       formData.append('resume', file);
 
+      console.log('Starting resume upload...');
       const result = await uploadResumeForChat(formData);
+      console.log('Resume upload successful:', result);
       
-      // Reload resumes list
-      await loadResumes();
-      
-      // Select the newly uploaded resume and create a new chat
-      if (result.resume) {
+      // Check if the upload was actually successful
+        if (result && result.success && result.resume) {
+          console.log('Resume uploaded successfully, reloading resumes...');
+          
+          // Add a small delay to ensure backend processing is complete
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Reload resumes list
+          try {
+            await loadResumes();
+            console.log('Resumes reloaded successfully');
+          } catch (loadError) {
+            console.error('Error reloading resumes after upload:', loadError);
+            // Don't show error if upload was successful but reload failed
+            // The resume is uploaded, user can refresh manually
+            console.log('Resume uploaded successfully but failed to reload list. User may need to refresh.');
+          }
+        
+        // Select the newly uploaded resume and create a new chat
         setSelectedResumeId(result.resume.id);
         localStorage.setItem(`chat_selected_resume_${user.id}`, result.resume.id);
         
@@ -523,10 +539,30 @@ export default function Chat() {
         setTimeout(() => {
           saveChatHistoryToDatabase();
         }, 500);
+        
+        console.log('Resume upload and setup completed successfully');
+      } else {
+        console.error('Upload response missing expected data:', result);
+        setUploadError('Upload completed but response was incomplete. Please refresh the page.');
       }
     } catch (error) {
       console.error('Error uploading resume:', error);
-      setUploadError(error.response?.data?.error || 'Failed to upload resume. Please try again.');
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      // Only show error if it's actually a failed upload
+      if (error.response?.status === 401) {
+        setUploadError('Authentication required. Please log in again.');
+      } else if (error.response?.status === 400) {
+        setUploadError(error.response?.data?.error || 'Invalid file or request. Please try again.');
+      } else if (error.response?.status >= 500) {
+        setUploadError('Server error. Please try again later.');
+      } else {
+        setUploadError(error.response?.data?.error || 'Failed to upload resume. Please try again.');
+      }
     } finally {
       setIsUploading(false);
       // Reset file input

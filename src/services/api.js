@@ -78,14 +78,20 @@ export const resendOTP = async (email) => {
 // RAG-based chat functions
 export const uploadResumeForChat = async (formData) => {
   try {
+    console.log('API: Starting resume upload request...');
     const response = await api.post('/api/chat/upload-resume', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 30000, // 30 second timeout for large files
     });
+    console.log('API: Resume upload response received:', response.data);
+    console.log('API: Response status:', response.status);
     return response.data;
   } catch (error) {
-    console.error('Error uploading resume for chat:', error);
+    console.error('API: Error uploading resume for chat:', error);
+    console.error('API: Error response:', error.response?.data);
+    console.error('API: Error status:', error.response?.status);
     throw error;
   }
 };
