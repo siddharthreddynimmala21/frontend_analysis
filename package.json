@@ -15,6 +15,7 @@
     "chromadb": "^3.0.5",
     "formik": "^2.4.6",
     "framer-motion": "^12.18.1",
+    "js-cookie": "^3.0.5",
     "lucide-react": "^0.515.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
