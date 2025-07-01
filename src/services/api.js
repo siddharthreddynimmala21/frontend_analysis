@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'; // Default to 3001 to match backend
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -17,6 +17,38 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Add response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API Error:', error.message);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+      
+      // Handle authentication errors
+      if (error.response.status === 401) {
+        console.log('Authentication error - redirecting to login');
+        // Clear invalid token
+        localStorage.removeItem('token');
+        
+        // Show alert to user about authentication issue
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/login' && currentPath !== '/register') {
+          // Only show alert if not already on login/register pages
+          alert('Your session has expired or you are not authenticated. Please log in again.');
+          
+          // Redirect to login page
+          window.location.href = '/login';
+        }
+      }
+    } else if (error.request) {
+      console.error('No response received. Backend may be down or unreachable.');
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const register = async (email) => {
   const response = await api.post('/api/auth/register', { email });
@@ -58,15 +90,34 @@ export const uploadResumeForChat = async (formData) => {
   }
 };
 
-// Get all user resumes
-export const getResumesForChat = async () => {
-  try {
-    const response = await api.get('/api/chat/resumes');
-    return response.data;
-  } catch (error) {
-    console.error('Error getting resumes for chat:', error);
-    throw error;
+// Get all user resumes with retry logic
+export const getResumesForChat = async (retryCount = 3, retryDelay = 1000) => {
+  let lastError;
+  
+  for (let attempt = 0; attempt < retryCount; attempt++) {
+    try {
+      const response = await api.get('/api/chat/resumes');
+      return response.data;
+    } catch (error) {
+      console.error(`Error getting resumes (attempt ${attempt + 1}/${retryCount}):`, error.message);
+      lastError = error;
+      
+      // Only retry for network errors or 5xx server errors
+      if (error.response && error.response.status < 500 && error.response.status !== 0) {
+        throw error; // Don't retry for client errors (4xx)
+      }
+      
+      if (attempt < retryCount - 1) {
+        console.log(`Retrying in ${retryDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        retryDelay *= 2; // Exponential backoff
+      }
+    }
   }
+  
+  // If we've exhausted all retries
+  console.error('Failed to get resumes after multiple attempts');
+  throw lastError;
 };
 
 // Delete a specific resume

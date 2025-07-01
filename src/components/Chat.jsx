@@ -25,8 +25,10 @@ export default function Chat() {
   const [resumes, setResumes] = useState([]);
   const [selectedResumeId, setSelectedResumeId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoadingResumes, setIsLoadingResumes] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [deleteError, setDeleteError] = useState('');
+  const [resumeLoadError, setResumeLoadError] = useState(null);
   const [chatSessions, setChatSessions] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -67,7 +69,19 @@ export default function Chat() {
   }, [messages, user, currentChatId, selectedResumeId]);
 
   const loadResumes = async () => {
+    setResumeLoadError(null); // Clear any previous errors
+    setIsLoadingResumes(true);
+    
     try {
+      // Check if user is authenticated
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        setResumeLoadError('Authentication required. Please log in to access your resumes.');
+        return;
+      }
+      
+      // getResumesForChat now has built-in retry logic
       const { resumes: resumeList } = await getResumesForChat();
       setResumes(resumeList);
       
@@ -80,8 +94,43 @@ export default function Chat() {
       } else {
         setSelectedResumeId(null);
       }
+      
+      // Store resumes in localStorage as a fallback
+      if (resumeList && resumeList.length > 0) {
+        localStorage.setItem(`resumes_backup_${user.id}`, JSON.stringify(resumeList));
+      }
     } catch (error) {
       console.error('Error loading resumes:', error);
+      
+      // Handle authentication errors specifically
+      if (error.response && error.response.status === 401) {
+        setResumeLoadError('Authentication required. Please log in again to continue.');
+        return;
+      }
+      
+      setResumeLoadError('Unable to load resumes. Please check your connection and try again.');
+      
+      // Try to load from localStorage backup if available
+      const backupResumes = localStorage.getItem(`resumes_backup_${user.id}`);
+      if (backupResumes) {
+        try {
+          const parsedResumes = JSON.parse(backupResumes);
+          console.log('Loaded resumes from localStorage backup:', parsedResumes.length);
+          setResumes(parsedResumes);
+          
+          // Select previously selected resume or first available from backup
+          const savedSelectedId = localStorage.getItem(`chat_selected_resume_${user.id}`);
+          if (savedSelectedId && parsedResumes.find(r => r.id === savedSelectedId)) {
+            setSelectedResumeId(savedSelectedId);
+          } else if (parsedResumes.length > 0) {
+            setSelectedResumeId(parsedResumes[0].id);
+          }
+        } catch (parseError) {
+          console.error('Error parsing backup resumes:', parseError);
+        }
+      }
+    } finally {
+      setIsLoadingResumes(false);
     }
   };
 
@@ -672,8 +721,35 @@ export default function Chat() {
             </div>
 
             {/* Resume Selection Dropdown */}
-            {resumes.length > 0 && (
-              <div className="mb-3">
+            <div className="mb-3">
+              {isLoadingResumes ? (
+                <div className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-sm text-white flex items-center justify-center">
+                  <div className="animate-pulse">Loading resumes...</div>
+                </div>
+              ) : resumeLoadError ? (
+                <div className="w-full p-2 bg-red-900/30 border border-red-600 rounded text-sm text-white">
+                  <div className="flex items-center mb-1">
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    <span>Error loading resumes</span>
+                  </div>
+                  <div className="text-xs opacity-80">{resumeLoadError}</div>
+                  {resumeLoadError.includes('Authentication') ? (
+                    <button 
+                      onClick={() => window.location.href = '/login'} 
+                      className="mt-1 text-xs bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded w-full"
+                    >
+                      Log In
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={loadResumes} 
+                      className="mt-1 text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded w-full"
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
+              ) : resumes.length > 0 ? (
                 <select
                   value={selectedResumeId || ''}
                   onChange={(e) => setSelectedResumeId(e.target.value)}
@@ -686,8 +762,12 @@ export default function Chat() {
                     </option>
                   ))}
                 </select>
-              </div>
-            )}
+              ) : (
+                <div className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-sm text-white text-center">
+                  No resumes available
+                </div>
+              )}
+            </div>
 
             {/* New Chat Button */}
             <button
@@ -830,7 +910,42 @@ export default function Chat() {
             </div>
 
             {/* No Resume State */}
-            {resumes.length === 0 && (
+            {isLoadingResumes ? (
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="text-center">
+                  <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <h3 className="text-xl font-semibold text-white mb-2">Loading Resumes</h3>
+                  <p className="text-gray-300 mb-6">
+                    Please wait while we load your resumes...
+                  </p>
+                </div>
+              </div>
+            ) : resumeLoadError ? (
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="text-center">
+                  <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">Error Loading Resumes</h3>
+                  <p className="text-gray-300 mb-6">
+                    {resumeLoadError}
+                  </p>
+                  {resumeLoadError.includes('Authentication') ? (
+                    <button 
+                      onClick={() => window.location.href = '/login'}
+                      className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg cursor-pointer transition-colors"
+                    >
+                      <span>Log In</span>
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={loadResumes}
+                      className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg cursor-pointer transition-colors"
+                    >
+                      <span>Try Again</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : resumes.length === 0 && (
               <div className="flex-1 flex items-center justify-center p-8">
                 <div className="text-center">
                   <AlertCircle className="w-16 h-16 text-blue-400 mx-auto mb-4" />
@@ -865,7 +980,7 @@ export default function Chat() {
             )}
 
             {/* No Chat Selected State */}
-            {resumes.length > 0 && !currentChatId && (
+            {!isLoadingResumes && !resumeLoadError && resumes.length > 0 && !currentChatId && (
               <div className="flex-1 flex items-center justify-center p-8">
                 <div className="text-center">
                   <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -878,7 +993,7 @@ export default function Chat() {
             )}
 
             {/* Messages container */}
-            {currentChatId && (
+            {!isLoadingResumes && !resumeLoadError && currentChatId && (
               <>
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                   {messages.map((message, index) => (

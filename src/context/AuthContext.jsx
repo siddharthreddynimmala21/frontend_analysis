@@ -6,12 +6,39 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Function to check if token is valid (not expired)
+  const isTokenValid = (token) => {
+    if (!token) return false;
+    
+    try {
+      // JWT tokens are in format: header.payload.signature
+      // We need to decode the payload (middle part)
+      const payload = token.split('.')[1];
+      if (!payload) return false;
+      
+      // Decode the base64 payload
+      const decodedPayload = JSON.parse(atob(payload));
+      
+      // Check if token is expired
+      const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+      return decodedPayload.exp > currentTime;
+    } catch (error) {
+      console.error('Error validating token:', error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     // Check if user is logged in by verifying the token in localStorage
     const token = localStorage.getItem('token');
-    if (token) {
+    
+    if (token && isTokenValid(token)) {
       setUser({ token });
+    } else if (token) {
+      // Token exists but is invalid - remove it
+      localStorage.removeItem('token');
     }
+    
     setLoading(false);
   }, []);
 
