@@ -80,7 +80,7 @@ export default function Chat() {
         setResumeLoadError('Authentication required. Please log in to access your resumes.');
         return;
       }
-      
+      //ignore
       // getResumesForChat now has built-in retry logic
       const { resumes: resumeList } = await getResumesForChat();
       setResumes(resumeList);
