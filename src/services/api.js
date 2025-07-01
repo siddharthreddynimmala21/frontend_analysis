@@ -1,10 +1,6 @@
 import axios from 'axios';
 
-// Use relative URL in production, absolute URL in development
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-
-// In production with empty VITE_API_BASE_URL, this will use relative URLs
-// which will work regardless of the deployment domain
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -19,48 +15,8 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  
-  // Always include credentials for cookie handling
-  config.withCredentials = true;
-  
   return config;
 });
-
-// Add response interceptor to handle token refresh
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    
-    // If error is 401 (Unauthorized) and we haven't tried to refresh the token yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      try {
-        // Try to get a new token
-        const response = await refreshToken();
-        
-        if (response.accessToken) {
-          // Update token in localStorage
-          localStorage.setItem('token', response.accessToken);
-          
-          // Update the authorization header
-          originalRequest.headers['Authorization'] = `Bearer ${response.accessToken}`;
-          
-          // Retry the original request
-          return api(originalRequest);
-        }
-      } catch (refreshError) {
-        // If refresh fails, we need to log the user out
-        localStorage.removeItem('token');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      }
-    }
-    
-    return Promise.reject(error);
-  }
-);
 
 export const register = async (email) => {
   const response = await api.post('/api/auth/register', { email });
@@ -77,24 +33,8 @@ export const setupPassword = async (email, otp, password) => {
   return response.data;
 };
 
-export const login = async (email, password, rememberMe = false) => {
-  const response = await api.post('/api/auth/login', { email, password, rememberMe }, {
-    withCredentials: true // Important for cookies
-  });
-  return response.data;
-};
-
-export const logout = async () => {
-  const response = await api.post('/api/auth/logout', {}, {
-    withCredentials: true // Important for cookies
-  });
-  return response.data;
-};
-
-export const refreshToken = async () => {
-  const response = await api.post('/api/auth/refresh-token', {}, {
-    withCredentials: true // Important for cookies
-  });
+export const login = async (email, password) => {
+  const response = await api.post('/api/auth/login', { email, password });
   return response.data;
 };
 

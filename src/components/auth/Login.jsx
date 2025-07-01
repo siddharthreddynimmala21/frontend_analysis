@@ -18,7 +18,6 @@ export default function Login() {
     initialValues: {
       email: '',
       password: '',
-      rememberMe: false,
     },
     validationSchema: Yup.object({
       email: Yup.string()
@@ -29,8 +28,8 @@ export default function Login() {
     onSubmit: async (values) => {
       try {
         setLoading(true);
-        const response = await login(values.email, values.password, values.rememberMe);
-        authLogin(response.token, values.rememberMe);
+        const response = await login(values.email, values.password);
+        authLogin(response.token);
         toast.success('Login successful!');
         navigate('/dashboard');
       } catch (error) {
@@ -122,19 +121,7 @@ export default function Login() {
               <span className="px-3 text-xs text-gray-400">or</span>
               <span className="h-px flex-1 bg-white/10" />
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="rememberMe"
-                  name="rememberMe"
-                  type="checkbox"
-                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                  {...formik.getFieldProps('rememberMe')}
-                />
-                <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-                  Remember me
-                </label>
-              </div>
+            <div className="flex justify-end">
               <button
                 type="button"
                 className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors focus:outline-none"
