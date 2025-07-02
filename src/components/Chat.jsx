@@ -27,9 +27,7 @@ export default function Chat() {
   const [selectedResumeId, setSelectedResumeId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoadingResumes, setIsLoadingResumes] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [deleteError, setDeleteError] = useState('');
-  const [resumeLoadError, setResumeLoadError] = useState(null);
+  // Removed error states - errors are now handled silently with console logging
   const [chatSessions, setChatSessions] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -69,8 +67,47 @@ export default function Chat() {
     }
   }, [messages, user, currentChatId, selectedResumeId]);
 
-  const loadResumes = async () => {
-    setResumeLoadError(null); // Clear any previous errors
+  // Cross-device synchronization using BroadcastChannel
+  useEffect(() => {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel('resume-updates');
+      
+      const handleBroadcastMessage = (event) => {
+        const { type, data } = event.data;
+        
+        switch (type) {
+          case 'RESUME_UPLOADED':
+            console.log('Received resume upload broadcast:', data);
+            // Refresh resumes list silently
+            loadResumes(false);
+            break;
+            
+          case 'RESUME_DELETED':
+            console.log('Received resume deletion broadcast:', data);
+            // Refresh resumes list silently
+            loadResumes(false);
+            break;
+            
+          case 'RESUMES_UPDATED':
+            console.log('Received resumes update broadcast:', data);
+            // Update local state with fresh data
+            if (data.resumes) {
+              setResumes(data.resumes);
+            }
+            break;
+        }
+      };
+      
+      channel.addEventListener('message', handleBroadcastMessage);
+      
+      return () => {
+        channel.removeEventListener('message', handleBroadcastMessage);
+        channel.close();
+      };
+    }
+  }, []);
+
+  const loadResumes = async (showErrorToUser = false) => {
     setIsLoadingResumes(true);
     
     try {
@@ -78,10 +115,9 @@ export default function Chat() {
       const token = localStorage.getItem('token');
       if (!token) {
         console.error('No authentication token found');
-        setResumeLoadError('Authentication required. Please log in to access your resumes.');
         return;
       }
-      //ignore
+      
       // getResumesForChat now has built-in retry logic
       const { resumes: resumeList } = await getResumesForChat();
       setResumes(resumeList);
@@ -100,18 +136,25 @@ export default function Chat() {
       if (resumeList && resumeList.length > 0) {
         localStorage.setItem(`resumes_backup_${user.id}`, JSON.stringify(resumeList));
       }
+      
+      // Successfully loaded resumes
+      
     } catch (error) {
       console.error('Error loading resumes:', error);
       
       // Handle authentication errors specifically
       if (error.response && error.response.status === 401) {
-        setResumeLoadError('Authentication required. Please log in again to continue.');
+        console.error('Authentication error - token may be expired');
         return;
       }
       
-      setResumeLoadError('Unable to load resumes. Please check your connection and try again.');
+      // Log error details for debugging
+      console.error('Failed to load resumes:', {
+        status: error.response?.status,
+        message: error.response?.data?.message || error.message
+      });
       
-      // Try to load from localStorage backup if available
+      // Always try to load from localStorage backup silently
       const backupResumes = localStorage.getItem(`resumes_backup_${user.id}`);
       if (backupResumes) {
         try {
@@ -479,25 +522,22 @@ export default function Chat() {
     if (!file) return;
 
     if (file.type !== 'application/pdf') {
-      setUploadError('Please upload a PDF file only.');
+      console.warn('Invalid file type: Please upload a PDF file only.');
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      setUploadError('File size must be less than 10MB.');
+      console.warn('File size too large: File size must be less than 10MB.');
       return;
     }
     
-    // Clear previous errors
-    setUploadError('');
-
+    // Check resume limit
     if (resumes.length >= 3) {
-      setUploadError('Maximum 3 resumes allowed. Please delete an existing resume first.');
+      console.warn('Maximum resume limit reached (3/3)');
       return;
     }
 
     setIsUploading(true);
-    setUploadError('');
 
     try {
       const formData = new FormData();
@@ -508,28 +548,36 @@ export default function Chat() {
       console.log('Resume upload successful:', result);
       
       // Check if the upload was actually successful
-        if (result && result.success && result.resume) {
-          console.log('Resume uploaded successfully, reloading resumes...');
-          
-          // Add a small delay to ensure backend processing is complete
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Reload resumes list
-          try {
-            await loadResumes();
-            console.log('Resumes reloaded successfully');
-          } catch (loadError) {
-            console.error('Error reloading resumes after upload:', loadError);
-            // Don't show error if upload was successful but reload failed
-            // The resume is uploaded, user can refresh manually
-            console.log('Resume uploaded successfully but failed to reload list. User may need to refresh.');
-          }
+      if (result && result.success && result.resume) {
+        console.log('Resume uploaded successfully, reloading resumes...');
+        
+        // Add a small delay to ensure backend processing is complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Reload resumes list silently
+        try {
+          await loadResumes(false); // Don't show errors to user
+          console.log('Resumes reloaded successfully');
+        } catch (loadError) {
+          console.error('Error reloading resumes after upload:', loadError);
+          // Silently handle reload errors - upload was successful
+        }
         
         // Select the newly uploaded resume and create a new chat
-        setSelectedResumeId(result.resume.id);
-        localStorage.setItem(`chat_selected_resume_${user.id}`, result.resume.id);
+        const resumeId = result.resume._id || result.resume.id;
+        setSelectedResumeId(resumeId);
+        localStorage.setItem(`chat_selected_resume_${user.id}`, resumeId);
         
-        // Use the centralized createNewChat function to avoid duplication
+        // Broadcast update to other tabs/windows
+        if (typeof BroadcastChannel !== 'undefined') {
+          const channel = new BroadcastChannel('resume-updates');
+          channel.postMessage({ 
+            type: 'RESUME_UPLOADED', 
+            data: { resume: result.resume, selectedResumeId: resumeId }
+          });
+        }
+        
+        // Use the centralized createNewChat function
         setTimeout(() => {
           createNewChat();
         }, 100);
@@ -537,7 +585,7 @@ export default function Chat() {
         console.log('Resume upload and setup completed successfully');
       } else {
         console.error('Upload response missing expected data:', result);
-        setUploadError('Upload completed but response was incomplete. Please refresh the page.');
+        // Silently handle incomplete response - don't show error to user
       }
     } catch (error) {
       console.error('Error uploading resume:', error);
@@ -547,16 +595,20 @@ export default function Chat() {
         status: error.response?.status
       });
       
-      // Only show error if it's actually a failed upload
+      // Handle authentication errors by redirecting
       if (error.response?.status === 401) {
-        setUploadError('Authentication required. Please log in again.');
-      } else if (error.response?.status === 400) {
-        setUploadError(error.response?.data?.error || 'Invalid file or request. Please try again.');
-      } else if (error.response?.status >= 500) {
-        setUploadError('Server error. Please try again later.');
-      } else {
-        setUploadError(error.response?.data?.error || 'Failed to upload resume. Please try again.');
+        localStorage.removeItem('token');
+        window.location.reload();
+        return;
       }
+      
+      // For all other errors, silently fail and log
+      console.error('Upload failed silently:', {
+        status: error.response?.status,
+        message: error.response?.data?.message || error.message,
+        fileName: file.name,
+        fileSize: file.size
+      });
     } finally {
       setIsUploading(false);
       // Reset file input
@@ -565,7 +617,6 @@ export default function Chat() {
   };
 
   const handleDeleteResume = async (resumeId) => {
-    setDeleteError(''); // Clear any previous delete errors
     const resumeToDelete = resumes.find(r => r.id === resumeId);
     if (!resumeToDelete) return;
 
@@ -574,7 +625,9 @@ export default function Chat() {
     }
 
     try {
+      console.log('Starting resume deletion for ID:', resumeId);
       await deleteResumeForChat(resumeId);
+      console.log('Resume deletion successful');
       
       // Remove from local state
       const updatedResumes = resumes.filter(r => r.id !== resumeId);
@@ -630,11 +683,34 @@ export default function Chat() {
         }
       }
       
+      // Broadcast update to other tabs/windows
+      if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel('resume-updates');
+        channel.postMessage({ 
+          type: 'RESUME_DELETED', 
+          data: { resumeId, deletedResume: resumeToDelete }
+        });
+      }
+      
     } catch (error) {
       console.error('Error deleting resume:', error);
-      setDeleteError(`Failed to delete resume "${resumeToDelete.fileName}". Please try again.`);
+      
+      // Handle authentication errors by redirecting
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        window.location.reload();
+        return;
+      }
+      
+      // For all other errors, silently fail and log
+      console.error('Delete failed silently:', {
+        status: error.response?.status,
+        message: error.response?.data?.message || error.message,
+        resumeId,
+        fileName: resumeToDelete.fileName
+      });
     } finally {
-      await loadResumes(); // Ensure resumes are reloaded after delete attempt
+      await loadResumes(false); // Silently reload resumes after delete attempt
     }
   };
 
@@ -749,29 +825,6 @@ export default function Chat() {
                 <div className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-sm text-white flex items-center justify-center">
                   <div className="animate-pulse">Loading resumes...</div>
                 </div>
-              ) : resumeLoadError ? (
-                <div className="w-full p-2 bg-red-900/30 border border-red-600 rounded text-sm text-white">
-                  <div className="flex items-center mb-1">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    <span>Error loading resumes</span>
-                  </div>
-                  <div className="text-xs opacity-80">{resumeLoadError}</div>
-                  {resumeLoadError.includes('Authentication') ? (
-                    <button 
-                      onClick={() => window.location.href = '/login'} 
-                      className="mt-1 text-xs bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded w-full"
-                    >
-                      Log In
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={loadResumes} 
-                      className="mt-1 text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded w-full"
-                    >
-                      Retry
-                    </button>
-                  )}
-                </div>
               ) : resumes.length > 0 ? (
                 <select
                   value={selectedResumeId || ''}
@@ -865,19 +918,7 @@ export default function Chat() {
                   </button>
                 </div>
               ))}
-              {uploadError && (
-                <div className="mt-2 text-red-500 text-sm flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {uploadError}
-                </div>
-              )}
 
-              {deleteError && (
-                <div className="mt-2 text-red-500 text-sm flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {deleteError}
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -943,31 +984,6 @@ export default function Chat() {
                   </p>
                 </div>
               </div>
-            ) : resumeLoadError ? (
-              <div className="flex-1 flex items-center justify-center p-8">
-                <div className="text-center">
-                  <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">Error Loading Resumes</h3>
-                  <p className="text-gray-300 mb-6">
-                    {resumeLoadError}
-                  </p>
-                  {resumeLoadError.includes('Authentication') ? (
-                    <button 
-                      onClick={() => window.location.href = '/login'}
-                      className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg cursor-pointer transition-colors"
-                    >
-                      <span>Log In</span>
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={loadResumes}
-                      className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg cursor-pointer transition-colors"
-                    >
-                      <span>Try Again</span>
-                    </button>
-                  )}
-                </div>
-              </div>
             ) : resumes.length === 0 && (
               <div className="flex-1 flex items-center justify-center p-8">
                 <div className="text-center">
@@ -993,17 +1009,13 @@ export default function Chat() {
                       <span className="text-sm">Processing...</span>
                     </div>
                   )}
-                  {uploadError && (
-                    <div className="mt-4 text-red-400 text-sm">
-                      {uploadError}
-                    </div>
-                  )}
+
                 </div>
               </div>
             )}
 
             {/* No Chat Selected State */}
-            {!isLoadingResumes && !resumeLoadError && resumes.length > 0 && !currentChatId && (
+            {!isLoadingResumes && resumes.length > 0 && !currentChatId && (
               <div className="flex-1 flex items-center justify-center p-8">
                 <div className="text-center">
                   <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -1016,7 +1028,7 @@ export default function Chat() {
             )}
 
             {/* Messages container */}
-            {!isLoadingResumes && !resumeLoadError && currentChatId && (
+            {!isLoadingResumes && currentChatId && (
               <>
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                   {messages.map((message, index) => (

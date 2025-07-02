@@ -75,66 +75,103 @@ export const resendOTP = async (email) => {
   return response.data;
 };
 
-// RAG-based chat functions
+// Enhanced retry utility function
+const retryWithBackoff = async (fn, maxRetries = 3, baseDelay = 1000) => {
+  let lastError;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry for client errors (4xx) except 408 (timeout) and 429 (rate limit)
+      if (error.response && error.response.status >= 400 && error.response.status < 500 && 
+          error.response.status !== 408 && error.response.status !== 429) {
+        throw error;
+      }
+      
+      if (attempt < maxRetries - 1) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`Retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+};
+
+// RAG-based chat functions with enhanced error handling
 export const uploadResumeForChat = async (formData) => {
-  try {
+  return retryWithBackoff(async () => {
     console.log('API: Starting resume upload request...');
     const response = await api.post('/api/chat/upload-resume', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 30000, // 30 second timeout for large files
+      timeout: 60000, // Increased to 60 seconds for large files
     });
     console.log('API: Resume upload response received:', response.data);
-    console.log('API: Response status:', response.status);
-    return response.data;
-  } catch (error) {
-    console.error('API: Error uploading resume for chat:', error);
-    console.error('API: Error response:', error.response?.data);
-    console.error('API: Error status:', error.response?.status);
-    throw error;
-  }
-};
-
-// Get all user resumes with retry logic
-export const getResumesForChat = async (retryCount = 3, retryDelay = 1000) => {
-  let lastError;
-  
-  for (let attempt = 0; attempt < retryCount; attempt++) {
-    try {
-      const response = await api.get('/api/chat/resumes');
-      return response.data;
-    } catch (error) {
-      console.error(`Error getting resumes (attempt ${attempt + 1}/${retryCount}):`, error.message);
-      lastError = error;
-      
-      // Only retry for network errors or 5xx server errors
-      if (error.response && error.response.status < 500 && error.response.status !== 0) {
-        throw error; // Don't retry for client errors (4xx)
-      }
-      
-      if (attempt < retryCount - 1) {
-        console.log(`Retrying in ${retryDelay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        retryDelay *= 2; // Exponential backoff
-      }
+    
+    // Validate response structure
+    if (!response.data || !response.data.success || !response.data.resume) {
+      throw new Error('Invalid response structure from server');
     }
-  }
-  
-  // If we've exhausted all retries
-  console.error('Failed to get resumes after multiple attempts');
-  throw lastError;
+    
+    return response.data;
+  }, 3, 2000); // 3 retries with 2 second base delay
 };
 
-// Delete a specific resume
-export const deleteResumeForChat = async (resumeId) => {
-  try {
-    const response = await api.delete(`/api/chat/resumes/${resumeId}`);
+// Get all user resumes with enhanced retry logic
+export const getResumesForChat = async () => {
+  return retryWithBackoff(async () => {
+    console.log('API: Fetching user resumes...');
+    const response = await api.get('/api/chat/resumes');
+    
+    // Validate response structure
+    if (!response.data || !response.data.hasOwnProperty('success')) {
+      throw new Error('Invalid response structure from server');
+    }
+    
+    console.log('API: Resumes fetched successfully:', response.data);
     return response.data;
+  }, 3, 1000); // 3 retries with 1 second base delay
+};
+
+// Add a function to refresh resumes across all devices
+export const refreshResumesAcrossDevices = async () => {
+  try {
+    // Force a fresh fetch from the server
+    const response = await getResumesForChat();
+    
+    // Broadcast to other tabs/windows if they exist
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel('resume-updates');
+      channel.postMessage({ type: 'RESUMES_UPDATED', data: response });
+    }
+    
+    return response;
   } catch (error) {
-    console.error('Error deleting resume for chat:', error);
+    console.error('Error refreshing resumes across devices:', error);
     throw error;
   }
+};
+
+// Delete a specific resume with retry logic
+export const deleteResumeForChat = async (resumeId) => {
+  return retryWithBackoff(async () => {
+    console.log(`API: Starting resume deletion for ID: ${resumeId}`);
+    const response = await api.delete(`/api/chat/resumes/${resumeId}`);
+    
+    // Validate response structure
+    if (!response.data || !response.data.success) {
+      throw new Error('Invalid response structure from server');
+    }
+    
+    console.log('API: Resume deletion successful:', response.data);
+    return response.data;
+  }, 3, 1000); // 3 retries with 1 second base delay
 };
 
 export const sendMessage = async (question, conversationHistory = [], resumeId) => {
