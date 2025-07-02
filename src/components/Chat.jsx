@@ -21,6 +21,7 @@ const MAX_USER_MESSAGES_PER_CHAT = 10; // Only count user messages, not bot resp
 export default function Chat() {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
+  const [isCreatingChat, setIsCreatingChat] = useState(false); // Prevent rapid chat creation
   const [isLoading, setIsLoading] = useState(false);
   const [resumes, setResumes] = useState([]);
   const [selectedResumeId, setSelectedResumeId] = useState(null);
@@ -286,63 +287,82 @@ export default function Chat() {
   };
 
   const createNewChat = () => {
-    if (!selectedResumeId) {
-      // Check if we have any resumes available
-      if (resumes.length > 0) {
-        setSelectedResumeId(resumes[0].id);
-      } else {
-        alert('Please upload a resume first');
-        return;
-      }
-    }
-
-    // Ensure the selected resume exists in the resumes array
-    const resumeExists = resumes.some(resume => resume.id === selectedResumeId);
-    const finalResumeId = resumeExists ? selectedResumeId : (resumes.length > 0 ? resumes[0].id : null);
-    
-    if (!finalResumeId) {
-      alert('Please upload a resume first');
+    // Prevent rapid chat creation
+    if (isCreatingChat) {
+      console.log('Chat creation already in progress, ignoring request');
       return;
     }
 
-    const newChatId = `chat_${Date.now()}`;
-    const selectedResume = resumes.find(r => r.id === finalResumeId);
-    
-    const newSession = {
-      id: newChatId,
-      resumeId: finalResumeId,
-      resumeName: selectedResume?.fileName || 'Unknown Resume',
-      name: `Chat with ${selectedResume?.fileName || 'Resume'}`,
-      lastMessage: '',
-      messageCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      lastActivity: new Date()
-    };
+    // Validate that we have resumes available
+    if (resumes.length === 0) {
+      alert('Please upload a resume first to start chatting.');
+      return;
+    }
 
-    const updatedSessions = [newSession, ...chatSessions];
-    setChatSessions(updatedSessions);
-    
-    // Save to localStorage as backup
-    localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
-    localStorage.setItem(`chat_selected_resume_${user.id}`, finalResumeId);
-    
-    setCurrentChatId(newChatId);
-    setSelectedResumeId(finalResumeId);
-    
-    const initialMessage = {
-      text: `Hello! I'm ready to help you with your resume: ${selectedResume?.fileName || 'Resume'}. What would you like to know?`,
-      isBot: true,
-      isSystem: true,
-      timestamp: new Date()
-    };
-    
-    setMessages([initialMessage]);
-    
-    // Save this initial chat to the database
-    setTimeout(() => {
-      saveChatHistoryToDatabase();
-    }, 500);
+    setIsCreatingChat(true);
+
+    try {
+      // Determine the resume to use for the new chat
+      let finalResumeId = selectedResumeId;
+      
+      // If no resume is selected or selected resume doesn't exist, use the first available
+      if (!finalResumeId || !resumes.some(resume => resume.id === finalResumeId)) {
+        finalResumeId = resumes[0].id;
+      }
+      
+      const selectedResume = resumes.find(r => r.id === finalResumeId);
+      if (!selectedResume) {
+        alert('Error: Resume not found. Please try again.');
+        return;
+      }
+
+      // Generate unique chat ID
+      const newChatId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const newSession = {
+        id: newChatId,
+        resumeId: finalResumeId,
+        resumeName: selectedResume.fileName,
+        name: `Chat with ${selectedResume.fileName}`,
+        lastMessage: '',
+        messageCount: 1, // Start with 1 for the initial message
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastActivity: new Date()
+      };
+
+      // Update state
+      const updatedSessions = [newSession, ...chatSessions];
+      setChatSessions(updatedSessions);
+      setCurrentChatId(newChatId);
+      setSelectedResumeId(finalResumeId);
+      
+      // Create initial welcome message
+      const initialMessage = {
+        text: `Hello! I'm ready to help you with your resume: ${selectedResume.fileName}. What would you like to know?`,
+        isBot: true,
+        isSystem: true,
+        timestamp: new Date()
+      };
+      
+      setMessages([initialMessage]);
+      
+      // Save to localStorage
+      localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
+      localStorage.setItem(`chat_selected_resume_${user.id}`, finalResumeId);
+      
+      // Save to database after a short delay to ensure state is updated
+      setTimeout(() => {
+        saveChatHistoryToDatabase();
+      }, 500);
+      
+      console.log('New chat created:', newChatId, 'with resume:', selectedResume.fileName);
+    } finally {
+      // Reset the flag after a short delay to prevent rapid creation
+      setTimeout(() => {
+        setIsCreatingChat(false);
+      }, 1000);
+    }
   };
 
   const switchToChat = async (chatId) => {
@@ -401,53 +421,56 @@ export default function Chat() {
     if (!window.confirm("Delete this chat?")) return;
     
     try {
-      // Delete from database
+      // Delete from database first
       await deleteChatHistory(chatId);
       console.log('Chat deleted from database successfully');
-    } catch (error) {
-      console.error('Error deleting chat from database:', error);
-    }
-    
-    // Update local state
-    const updatedSessions = chatSessions.filter(s => s.id !== chatId);
-    setChatSessions(updatedSessions);
-    
-    // Clean up localStorage as backup
-    localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
-    localStorage.removeItem(`chat_history_${user.id}_${chatId}`);
-    
-    if (currentChatId === chatId) {
-      if (updatedSessions.length > 0) {
-        // Switch to the first available chat
-        const nextChat = updatedSessions[0];
-        setCurrentChatId(nextChat.id);
-        
-        // Ensure the resume exists
-        const resumeExists = resumes.some(resume => resume.id === nextChat.resumeId);
-        if (resumeExists) {
-          setSelectedResumeId(nextChat.resumeId);
-        } else if (resumes.length > 0) {
-          // If the resume doesn't exist anymore, use the first available one
-          setSelectedResumeId(resumes[0].id);
-        }
-        
-        // Load the chat history for the next chat
-        loadChatHistory();
-      } else {
-        // No more chats available
-        setCurrentChatId(null);
-        setMessages([]);
-        
-        // If there are resumes available, prompt to create a new chat
-        if (resumes.length > 0) {
-          setSelectedResumeId(resumes[0].id);
-          setTimeout(() => {
-            if (window.confirm('Would you like to start a new chat with your resume?')) {
-              createNewChat();
-            }
-          }, 500);
+      
+      // Update local state only after successful database deletion
+      const updatedSessions = chatSessions.filter(s => s.id !== chatId);
+      setChatSessions(updatedSessions);
+      
+      // Clean up localStorage
+      localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
+      localStorage.removeItem(`chat_history_${user.id}_${chatId}`);
+      
+      // Handle current chat deletion
+      if (currentChatId === chatId) {
+        if (updatedSessions.length > 0) {
+          // Switch to the first available chat
+          const nextChat = updatedSessions[0];
+          setCurrentChatId(nextChat.id);
+          
+          // Ensure the resume exists
+          const resumeExists = resumes.some(resume => resume.id === nextChat.resumeId);
+          if (resumeExists) {
+            setSelectedResumeId(nextChat.resumeId);
+            localStorage.setItem(`chat_selected_resume_${user.id}`, nextChat.resumeId);
+          } else if (resumes.length > 0) {
+            // If the resume doesn't exist anymore, use the first available one
+            setSelectedResumeId(resumes[0].id);
+            localStorage.setItem(`chat_selected_resume_${user.id}`, resumes[0].id);
+          }
+          
+          // Load the chat history for the next chat
+          loadChatHistory();
+        } else {
+          // No more chats available - clean state
+          setCurrentChatId(null);
+          setMessages([]);
+          
+          // Set selected resume if available but don't auto-create chat
+          if (resumes.length > 0) {
+            setSelectedResumeId(resumes[0].id);
+            localStorage.setItem(`chat_selected_resume_${user.id}`, resumes[0].id);
+          } else {
+            setSelectedResumeId(null);
+            localStorage.removeItem(`chat_selected_resume_${user.id}`);
+          }
         }
       }
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      alert('Failed to delete chat. Please try again.');
     }
   };
 
@@ -506,39 +529,10 @@ export default function Chat() {
         setSelectedResumeId(result.resume.id);
         localStorage.setItem(`chat_selected_resume_${user.id}`, result.resume.id);
         
-        // Create new chat with the uploaded resume
-        const newChatId = `chat_${Date.now()}`;
-        const newSession = {
-          id: newChatId,
-          resumeId: result.resume.id,
-          resumeName: result.resume.fileName,
-          name: `Chat with ${result.resume.fileName}`,
-          lastMessage: '',
-          messageCount: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          lastActivity: new Date()
-        };
-
-        const updatedSessions = [newSession, ...chatSessions];
-        setChatSessions(updatedSessions);
-        localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
-        
-        setCurrentChatId(newChatId);
-        
-        const initialMessage = {
-          text: `Hello! I'm ready to help you with your resume: ${result.resume.fileName}. What would you like to know?`,
-          isBot: true,
-          isSystem: true,
-          timestamp: new Date()
-        };
-        
-        setMessages([initialMessage]);
-        
-        // Save this initial chat to the database
+        // Use the centralized createNewChat function to avoid duplication
         setTimeout(() => {
-          saveChatHistoryToDatabase();
-        }, 500);
+          createNewChat();
+        }, 100);
         
         console.log('Resume upload and setup completed successfully');
       } else {
@@ -613,18 +607,11 @@ export default function Chat() {
             loadChatHistory();
           }, 100);
         } else if (updatedResumes.length > 0) {
-          // No chats left, but we have resumes - create a new chat
+          // No chats left, but we have resumes - just set the resume without auto-creating chat
           setCurrentChatId(null);
           setSelectedResumeId(updatedResumes[0].id);
           localStorage.setItem(`chat_selected_resume_${user.id}`, updatedResumes[0].id);
           setMessages([]);
-          
-          // Prompt to create a new chat
-          setTimeout(() => {
-            if (window.confirm('Would you like to start a new chat with your remaining resume?')) {
-              createNewChat();
-            }
-          }, 500);
         } else {
           // No resumes left
           setCurrentChatId(null);
@@ -808,11 +795,11 @@ export default function Chat() {
             {/* New Chat Button */}
             <button
               onClick={createNewChat}
-              disabled={!selectedResumeId}
+              disabled={!selectedResumeId || isCreatingChat}
               className="w-full flex items-center justify-center space-x-2 p-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-sm transition-colors"
             >
               <Plus className="w-4 h-4" />
-              <span>New Chat</span>
+              <span>{isCreatingChat ? 'Creating...' : 'New Chat'}</span>
             </button>
           </div>
 
@@ -830,7 +817,7 @@ export default function Chat() {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{session.title}</p>
+                    <p className="font-medium truncate">{session.name}</p>
                     <p className="text-xs text-gray-400 truncate">{session.lastMessage || 'No messages yet'}</p>
                   </div>
                   <button
