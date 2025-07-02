@@ -339,7 +339,7 @@ export default function Chat() {
       
       // Create initial welcome message
       const initialMessage = {
-        text: `Hello! I'm ready to help you with your resume: ${selectedResume.fileName}. What would you like to know?`,
+        text: `Hi! I'm your resume analysis assistant. I can help you with your resume: ${selectedResume.fileName}. How can I assist you today?`,
         isBot: true,
         isSystem: true,
         timestamp: new Date()
@@ -397,7 +397,7 @@ export default function Chat() {
           // If no history is found, initialize with a welcome message
           const selectedResume = resumes.find(r => resumeExists ? r.id === session.resumeId : r.id === resumes[0].id);
           setMessages([{
-            text: `Hello! I'm ready to help you with your resume: ${selectedResume?.fileName || 'Resume'}. What would you like to know?`,
+            text: `Hi! I'm your resume analysis assistant. I can help you with your resume: ${selectedResume?.fileName || 'Resume'}. How can I assist you today?`,
             isBot: true,
             isSystem: true,
             timestamp: new Date()
@@ -408,7 +408,7 @@ export default function Chat() {
         // Initialize with a welcome message if there's an error
         const selectedResume = resumes.find(r => resumeExists ? r.id === session.resumeId : r.id === resumes[0].id);
         setMessages([{
-          text: `Hello! I'm ready to help you with your resume: ${selectedResume?.fileName || 'Resume'}. What would you like to know?`,
+          text: `Hi! I'm your resume analysis assistant. I can help you with your resume: ${selectedResume?.fileName || 'Resume'}. How can I assist you today?`,
           isBot: true,
           isSystem: true,
           timestamp: new Date()
