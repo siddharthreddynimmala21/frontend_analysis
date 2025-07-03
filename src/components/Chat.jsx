@@ -1044,7 +1044,7 @@ export default function Chat() {
                   </p>
                 </div>
               </div>
-            ) : resumes.length === 0 && (
+            ) : resumes.length === 0 && !currentChatId && (
               <div className="flex-1 flex items-center justify-center p-8">
                 <div className="text-center">
                   <AlertCircle className="w-16 h-16 text-blue-400 mx-auto mb-4" />
@@ -1081,7 +1081,7 @@ export default function Chat() {
                   <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-white mb-2">Start a New Chat</h3>
                   <p className="text-gray-300 mb-6">
-                    Select a resume and create a new chat to get started.
+                    Create a new chat to get started with your selected resume.
                   </p>
                 </div>
               </div>
@@ -1114,6 +1114,18 @@ export default function Chat() {
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-150"></div>
                             </div>
                         </div>
+                    </div>
+                  )}
+                  
+                  {resumes.length === 0 && messages.length === 0 && (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center p-6 bg-white/5 rounded-lg">
+                        <MessageSquare className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+                        <h3 className="text-lg font-medium text-white mb-2">General Chat Mode</h3>
+                        <p className="text-sm text-gray-300">
+                          You're chatting without a resume. For personalized resume analysis, upload a resume using the sidebar.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
