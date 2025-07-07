@@ -75,13 +75,12 @@ function CustomDropdown({ value, onChange, disabled, options }) {
 export default function Chat() {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
-  const [isCreatingChat, setIsCreatingChat] = useState(false); // Prevent rapid chat creation
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [resumes, setResumes] = useState([]);
   const [selectedResumeId, setSelectedResumeId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoadingResumes, setIsLoadingResumes] = useState(false);
-  // Removed error states - errors are now handled silently with console logging
   const [chatSessions, setChatSessions] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -408,22 +407,16 @@ export default function Chat() {
     }
   };
 
-  const createNewChat = () => {
-    // Prevent rapid chat creation
-    if (isCreatingChat) {
-      console.log('Chat creation already in progress, ignoring request');
-      return;
-    }
-  
-    // Check if user has reached the maximum number of active chats
-    if (chatSessions.length >= MAX_ACTIVE_CHATS) {
-      alert(`You've reached the maximum limit of ${MAX_ACTIVE_CHATS} active chats. Please delete an existing chat before creating a new one.`);
-      return;
-    }
-  
+  const createNewChat = async () => {
+    if (isCreatingChat) return;
     setIsCreatingChat(true);
-  
     try {
+      // Check if user has reached the maximum number of active chats
+      if (chatSessions.length >= MAX_ACTIVE_CHATS) {
+        alert(`You've reached the maximum limit of ${MAX_ACTIVE_CHATS} active chats. Please delete an existing chat before creating a new one.`);
+        return;
+      }
+    
       // Determine the resume to use for the new chat
       let finalResumeId = selectedResumeId;
       let selectedResume = null;
@@ -508,10 +501,7 @@ export default function Chat() {
       
       console.log('New chat created:', newChatId, finalResumeId ? `with resume: ${selectedResume.fileName}` : 'as general chat');
     } finally {
-      // Reset the flag after a short delay to prevent rapid creation
-      setTimeout(() => {
-        setIsCreatingChat(false);
-      }, 1000);
+      setIsCreatingChat(false);
     }
   };
 
@@ -581,63 +571,11 @@ export default function Chat() {
   };
 
   const deleteChat = async (chatId) => {
-    if (!window.confirm("Delete this chat?")) return;
-    
-    try {
-      // Delete from database first
-      await deleteChatHistory(chatId);
-      console.log('Chat deleted from database successfully');
-      
-      // Update local state only after successful database deletion
-      const updatedSessions = chatSessions.filter(s => s.id !== chatId);
-      setChatSessions(updatedSessions);
-      
-      // Clean up localStorage
-      localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
-      localStorage.removeItem(`chat_history_${user.id}_${chatId}`);
-      
-      // Handle current chat deletion
-      if (currentChatId === chatId) {
-        if (updatedSessions.length > 0) {
-          // Switch to the first available chat
-          const nextChat = updatedSessions[0];
-          setCurrentChatId(nextChat.id);
-          
-          // Ensure the resume exists
-          const resumeExists = resumes.some(resume => resume.id === nextChat.resumeId);
-          if (resumeExists) {
-            setSelectedResumeId(nextChat.resumeId);
-            localStorage.setItem(`chat_selected_resume_${user.id}`, nextChat.resumeId);
-          } else if (resumes.length > 0) {
-            setSelectedResumeId(resumes[0].id);
-            localStorage.setItem(`chat_selected_resume_${user.id}`, resumes[0].id);
-          }
-          
-          // Load the chat history for the next chat
-          loadChatHistory();
-        } else {
-          // No more chats available - clean state
-          setCurrentChatId(null);
-          setMessages([]);
-          
-          // Set selected resume if available but don't auto-create chat
-          if (resumes.length > 0) {
-            setSelectedResumeId(resumes[0].id);
-            localStorage.setItem(`chat_selected_resume_${user.id}`, resumes[0].id);
-          } else {
-            setSelectedResumeId(null);
-            localStorage.removeItem(`chat_selected_resume_${user.id}`);
-          }
-        }
-      }
-      
-      // Force refresh chat sessions from server to ensure sync
-      setTimeout(() => {
-        loadChatSessions();
-      }, 500);
-    } catch (error) {
-      console.error('Error deleting chat:', error);
-      alert('Failed to delete chat. Please try again.');
+    await deleteChatHistory(chatId);
+    await loadChatSessions();
+    if (currentChatId === chatId) {
+      setCurrentChatId(null);
+      setMessages([]);
     }
   };
 
@@ -694,11 +632,16 @@ export default function Chat() {
         
         // Immediately update local state for instant UI feedback
         setResumes(prev => {
-          const exists = prev.find(r => r.id === resumeId);
-          if (!exists) {
-            return [...prev, newResume];
+          const idx = prev.findIndex(r => r.id === resumeId);
+          if (idx !== -1) {
+            // Replace the existing resume and move it to the top
+            const updated = [...prev];
+            updated.splice(idx, 1);
+            return [newResume, ...updated];
+          } else {
+            // Add new resume to the top
+            return [newResume, ...prev];
           }
-          return prev;
         });
         
         // Select the newly uploaded resume
@@ -953,6 +896,11 @@ export default function Chat() {
       }
     }
   };
+
+  // Helper to find the resume for the current chat
+  const currentSession = chatSessions.find(s => s.id === currentChatId);
+  const currentResume = resumes.find(r => r.id === currentSession?.resumeId);
+  const isResumeDeleted = currentSession && !currentResume && currentSession.resumeId;
 
   return (
     <div className="flex h-screen bg-gray-900 text-white relative">
@@ -1254,6 +1202,14 @@ export default function Chat() {
                   <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
                 </div>
               </>
+            )}
+
+            {/* Resume Deletion Warning */}
+            {isResumeDeleted && (
+              <div className="bg-yellow-200 text-yellow-900 p-2 rounded mb-2 flex items-center">
+                <AlertCircle className="w-5 h-5 mr-2" />
+                This resume has been deleted. You can still view the chat history.
+              </div>
             )}
           </motion.div>
         </div>
