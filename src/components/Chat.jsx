@@ -623,6 +623,11 @@ export default function Chat() {
           }
         }
       }
+      
+      // Force refresh chat sessions from server to ensure sync
+      setTimeout(() => {
+        loadChatSessions();
+      }, 500);
     } catch (error) {
       console.error('Error deleting chat:', error);
       alert('Failed to delete chat. Please try again.');
@@ -931,6 +936,13 @@ export default function Chat() {
         ease: "easeOut",
         // Ensure animation completes
         when: "beforeChildren"
+      }
+    },
+    exit: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.2
       }
     }
   };
