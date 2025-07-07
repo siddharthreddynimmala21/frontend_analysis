@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import ChatMessage from './chat/ChatMessage';
@@ -18,6 +18,59 @@ import { Upload, FileText, Trash2, AlertCircle, ChevronDown, Plus, MessageSquare
 
 const MAX_USER_MESSAGES_PER_CHAT = 10; // Only count user messages, not bot responses
 const MAX_ACTIVE_CHATS = 5; // Maximum number of active chats a user can have
+
+// Custom Dropdown Component
+function CustomDropdown({ value, onChange, disabled, options }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  
+  const selectedOption = options.find(option => option.value === value) || options[0];
+  
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        className={`w-full p-2 bg-gray-700 border border-gray-600 rounded text-sm text-white flex items-center justify-between ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+      >
+        <span>{selectedOption.label}</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
+      </button>
+      
+      {isOpen && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+          {options.map((option) => (
+            <div
+              key={option.value}
+              className={`p-2 hover:bg-gray-600 cursor-pointer ${option.value === value ? 'bg-blue-500/20' : ''}`}
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+            >
+              {option.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Chat() {
   const { user } = useAuth();
@@ -885,33 +938,32 @@ export default function Chat() {
             </div>
 
             {/* Resume Selection Dropdown */}
-            <div className="mb-3">
+            <div className="mb-3 relative">
               {isLoadingResumes ? (
                 <div className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-sm text-white flex items-center justify-center">
                   <div className="animate-pulse">Loading resumes...</div>
                 </div>
               ) : resumes.length > 0 ? (
-                <select
+                <CustomDropdown 
                   value={selectedResumeId || ''}
-                  onChange={(e) => {
+                  onChange={(value) => {
                     // Prevent resume switching if there's an active chat with messages
                     if (currentChatId && messages.length > 1) {
                       alert('Cannot switch resumes during an active chat. Please create a new chat to use a different resume.');
                       return;
                     }
-                    setSelectedResumeId(e.target.value);
-                    localStorage.setItem(`chat_selected_resume_${user.id}`, e.target.value);
+                    setSelectedResumeId(value);
+                    localStorage.setItem(`chat_selected_resume_${user.id}`, value);
                   }}
-                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-sm text-white"
                   disabled={currentChatId && messages.length > 1}
-                >
-                  <option value="">Select Resume</option>
-                  {resumes.map((resume, index) => (
-                    <option key={resume.id} value={resume.id}>
-                      Resume {index + 1}: {resume.fileName.length > 20 ? resume.fileName.substring(0, 20) + '...' : resume.fileName}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: 'Select Resume' },
+                    ...resumes.map((resume, index) => ({
+                      value: resume.id,
+                      label: `Resume ${index + 1}: ${resume.fileName.length > 20 ? resume.fileName.substring(0, 20) + '...' : resume.fileName}`
+                    }))
+                  ]}
+                />
               ) : (
                 <div className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-sm text-white text-center">
                   No resumes available
