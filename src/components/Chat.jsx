@@ -517,59 +517,27 @@ export default function Chat() {
       if (currentChatId && messages.length > 0) {
         await saveChatHistoryToDatabase();
       }
-      
-      // Update selected resume ID
-      const resumeExists = resumes.some(resume => resume.id === session.resumeId);
-      if (resumeExists) {
-        setSelectedResumeId(session.resumeId);
-        localStorage.setItem(`chat_selected_resume_${user.id}`, session.resumeId);
-      } else if (resumes.length > 0) {
-        // If the resume doesn't exist anymore, use the first available one
-        setSelectedResumeId(resumes[0].id);
-        localStorage.setItem(`chat_selected_resume_${user.id}`, resumes[0].id);
-      }
-      
-      // Switch to the new chat
+      // Always use the resumeId associated with this chat session
+      setSelectedResumeId(session.resumeId);
+      localStorage.setItem(`chat_selected_resume_${user.id}`, session.resumeId);
       setCurrentChatId(chatId);
       setSidebarOpen(false);
-      
       // Load chat history for the new chat
       try {
         const history = await getChatHistory(chatId);
         if (history && history.length > 0) {
-          // Use setTimeout to ensure messages are properly rendered
           setTimeout(() => {
             setMessages(history);
           }, 100);
         } else {
-          // If no history is found, initialize with a welcome message
-          const selectedResume = resumes.find(r => resumeExists ? r.id === session.resumeId : r.id === resumes[0].id);
-          const initialMessage = {
-            text: `Hi! I'm your resume analysis assistant. I can help you with your resume: ${selectedResume?.fileName || 'Resume'}. How can I assist you today?`,
-            isBot: true,
-            isSystem: true,
-            timestamp: new Date()
-          };
-          
-          // Use setTimeout to ensure message is properly rendered
           setTimeout(() => {
-            setMessages([initialMessage]);
+            setMessages([]);
           }, 100);
         }
       } catch (error) {
         console.error('Error loading chat history when switching chats:', error);
-        // Initialize with a welcome message if there's an error
-        const selectedResume = resumes.find(r => resumeExists ? r.id === session.resumeId : r.id === resumes[0].id);
-        const initialMessage = {
-          text: `Hi! I'm your resume analysis assistant. I can help you with your resume: ${selectedResume?.fileName || 'Resume'}. How can I assist you today?`,
-          isBot: true,
-          isSystem: true,
-          timestamp: new Date()
-        };
-        
-        // Use setTimeout to ensure message is properly rendered
         setTimeout(() => {
-          setMessages([initialMessage]);
+          setMessages([]);
         }, 100);
       }
     }
@@ -724,58 +692,16 @@ export default function Chat() {
       setShowConfirmDialog(false);
       try {
         await deleteResumeForChat(resumeId);
-        // Immediately update local state for instant UI feedback
+        // Only update resumes state, do NOT remove chat sessions
         const updatedResumes = resumes.filter(r => r.id !== resumeId);
         setResumes(updatedResumes);
-        
-        // Update localStorage backup immediately
         if (updatedResumes.length > 0) {
           localStorage.setItem(`resumes_backup_${user.id}`, JSON.stringify(updatedResumes));
         } else {
           localStorage.removeItem(`resumes_backup_${user.id}`);
         }
-        
-        // Remove all chat sessions related to this resume
-        const updatedSessions = chatSessions.filter(s => s.resumeId !== resumeId);
-        setChatSessions(updatedSessions);
-        localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
-        
-        // Clear chat histories for deleted resume
-        chatSessions.forEach(session => {
-          if (session.resumeId === resumeId) {
-            localStorage.removeItem(`chat_history_${user.id}_${session.id}`);
-          }
-        });
-        
-        // If current chat was using deleted resume, switch to another or clear
-        const currentSession = chatSessions.find(s => s.id === currentChatId);
-        if (currentSession && currentSession.resumeId === resumeId) {
-          if (updatedSessions.length > 0) {
-            // Switch to another chat
-            const nextChat = updatedSessions[0];
-            setCurrentChatId(nextChat.id);
-            setSelectedResumeId(nextChat.resumeId);
-            localStorage.setItem(`chat_selected_resume_${user.id}`, nextChat.resumeId);
-            
-            // Load the chat history for the next chat
-            setTimeout(() => {
-              loadChatHistory();
-            }, 100);
-          } else if (updatedResumes.length > 0) {
-            // No chats left, but we have resumes - just set the resume without auto-creating chat
-            setCurrentChatId(null);
-            setSelectedResumeId(updatedResumes[0].id);
-            localStorage.setItem(`chat_selected_resume_${user.id}`, updatedResumes[0].id);
-            setMessages([]);
-          } else {
-            // No resumes left
-            setCurrentChatId(null);
-            setSelectedResumeId(null);
-            localStorage.removeItem(`chat_selected_resume_${user.id}`);
-            setMessages([]);
-          }
-        } else if (selectedResumeId === resumeId) {
-          // If selected resume was deleted but not the current chat
+        // If current chat was using deleted resume, show warning but do not remove chat
+        if (selectedResumeId === resumeId) {
           if (updatedResumes.length > 0) {
             setSelectedResumeId(updatedResumes[0].id);
             localStorage.setItem(`chat_selected_resume_${user.id}`, updatedResumes[0].id);
@@ -784,7 +710,6 @@ export default function Chat() {
             localStorage.removeItem(`chat_selected_resume_${user.id}`);
           }
         }
-        
         // Broadcast update to other tabs/windows
         if (typeof BroadcastChannel !== 'undefined') {
           const channel = new BroadcastChannel('resume-updates');
@@ -793,7 +718,6 @@ export default function Chat() {
             data: { resumeId, deletedResume: resumeToDelete }
           });
         }
-        
       } finally {
         await loadResumes(false);
       }
