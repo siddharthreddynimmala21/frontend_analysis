@@ -15,6 +15,7 @@ import {
 } from '../services/api';
 import Navigation from './common/Navigation';
 import { Upload, FileText, Trash2, AlertCircle, ChevronDown, Plus, MessageSquare, Menu, X } from 'lucide-react';
+import ConfirmationDialog from './common/ConfirmationDialog';
 
 const MAX_USER_MESSAGES_PER_CHAT = 10; // Only count user messages, not bot responses
 const MAX_ACTIVE_CHATS = 5; // Maximum number of active chats a user can have
@@ -84,6 +85,10 @@ export default function Chat() {
   const [chatSessions, setChatSessions] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Dialog state for resume and chat deletion
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmDialogMessage, setConfirmDialogMessage] = useState('');
+  const [confirmDialogAction, setConfirmDialogAction] = useState(() => () => {});
 
   // Load resumes and chat sessions on component mount
   useEffect(() => {
@@ -570,13 +575,18 @@ export default function Chat() {
     }
   };
 
-  const deleteChat = async (chatId) => {
-    await deleteChatHistory(chatId);
-    await loadChatSessions();
-    if (currentChatId === chatId) {
-      setCurrentChatId(null);
-      setMessages([]);
-    }
+  const deleteChat = (chatId) => {
+    setConfirmDialogMessage('Delete this chat?');
+    setConfirmDialogAction(() => async () => {
+      setShowConfirmDialog(false);
+      await deleteChatHistory(chatId);
+      await loadChatSessions();
+      if (currentChatId === chatId) {
+        setCurrentChatId(null);
+        setMessages([]);
+      }
+    });
+    setShowConfirmDialog(true);
   };
 
   const handleFileUpload = async (event) => {
@@ -706,109 +716,89 @@ export default function Chat() {
     }
   };
 
-  const handleDeleteResume = async (resumeId) => {
+  const handleDeleteResume = (resumeId) => {
     const resumeToDelete = resumes.find(r => r.id === resumeId);
     if (!resumeToDelete) return;
-
-    if (!window.confirm(`Do you want to delete "${resumeToDelete.fileName}"?`)) {
-      return;
-    }
-
-    try {
-      console.log('Starting resume deletion for ID:', resumeId);
-      await deleteResumeForChat(resumeId);
-      console.log('Resume deletion successful');
-      
-      // Immediately update local state for instant UI feedback
-      const updatedResumes = resumes.filter(r => r.id !== resumeId);
-      setResumes(updatedResumes);
-      
-      // Update localStorage backup immediately
-      if (updatedResumes.length > 0) {
-        localStorage.setItem(`resumes_backup_${user.id}`, JSON.stringify(updatedResumes));
-      } else {
-        localStorage.removeItem(`resumes_backup_${user.id}`);
-      }
-      
-      // Remove all chat sessions related to this resume
-      const updatedSessions = chatSessions.filter(s => s.resumeId !== resumeId);
-      setChatSessions(updatedSessions);
-      localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
-      
-      // Clear chat histories for deleted resume
-      chatSessions.forEach(session => {
-        if (session.resumeId === resumeId) {
-          localStorage.removeItem(`chat_history_${user.id}_${session.id}`);
-        }
-      });
-      
-      // If current chat was using deleted resume, switch to another or clear
-      const currentSession = chatSessions.find(s => s.id === currentChatId);
-      if (currentSession && currentSession.resumeId === resumeId) {
-        if (updatedSessions.length > 0) {
-          // Switch to another chat
-          const nextChat = updatedSessions[0];
-          setCurrentChatId(nextChat.id);
-          setSelectedResumeId(nextChat.resumeId);
-          localStorage.setItem(`chat_selected_resume_${user.id}`, nextChat.resumeId);
-          
-          // Load the chat history for the next chat
-          setTimeout(() => {
-            loadChatHistory();
-          }, 100);
-        } else if (updatedResumes.length > 0) {
-          // No chats left, but we have resumes - just set the resume without auto-creating chat
-          setCurrentChatId(null);
-          setSelectedResumeId(updatedResumes[0].id);
-          localStorage.setItem(`chat_selected_resume_${user.id}`, updatedResumes[0].id);
-          setMessages([]);
-        } else {
-          // No resumes left
-          setCurrentChatId(null);
-          setSelectedResumeId(null);
-          localStorage.removeItem(`chat_selected_resume_${user.id}`);
-          setMessages([]);
-        }
-      } else if (selectedResumeId === resumeId) {
-        // If selected resume was deleted but not the current chat
+    setConfirmDialogMessage(`Do you want to delete "${resumeToDelete.fileName}"?`);
+    setConfirmDialogAction(() => async () => {
+      setShowConfirmDialog(false);
+      try {
+        await deleteResumeForChat(resumeId);
+        // Immediately update local state for instant UI feedback
+        const updatedResumes = resumes.filter(r => r.id !== resumeId);
+        setResumes(updatedResumes);
+        
+        // Update localStorage backup immediately
         if (updatedResumes.length > 0) {
-          setSelectedResumeId(updatedResumes[0].id);
-          localStorage.setItem(`chat_selected_resume_${user.id}`, updatedResumes[0].id);
+          localStorage.setItem(`resumes_backup_${user.id}`, JSON.stringify(updatedResumes));
         } else {
-          setSelectedResumeId(null);
-          localStorage.removeItem(`chat_selected_resume_${user.id}`);
+          localStorage.removeItem(`resumes_backup_${user.id}`);
         }
-      }
-      
-      // Broadcast update to other tabs/windows
-      if (typeof BroadcastChannel !== 'undefined') {
-        const channel = new BroadcastChannel('resume-updates');
-        channel.postMessage({ 
-          type: 'RESUME_DELETED', 
-          data: { resumeId, deletedResume: resumeToDelete }
+        
+        // Remove all chat sessions related to this resume
+        const updatedSessions = chatSessions.filter(s => s.resumeId !== resumeId);
+        setChatSessions(updatedSessions);
+        localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
+        
+        // Clear chat histories for deleted resume
+        chatSessions.forEach(session => {
+          if (session.resumeId === resumeId) {
+            localStorage.removeItem(`chat_history_${user.id}_${session.id}`);
+          }
         });
+        
+        // If current chat was using deleted resume, switch to another or clear
+        const currentSession = chatSessions.find(s => s.id === currentChatId);
+        if (currentSession && currentSession.resumeId === resumeId) {
+          if (updatedSessions.length > 0) {
+            // Switch to another chat
+            const nextChat = updatedSessions[0];
+            setCurrentChatId(nextChat.id);
+            setSelectedResumeId(nextChat.resumeId);
+            localStorage.setItem(`chat_selected_resume_${user.id}`, nextChat.resumeId);
+            
+            // Load the chat history for the next chat
+            setTimeout(() => {
+              loadChatHistory();
+            }, 100);
+          } else if (updatedResumes.length > 0) {
+            // No chats left, but we have resumes - just set the resume without auto-creating chat
+            setCurrentChatId(null);
+            setSelectedResumeId(updatedResumes[0].id);
+            localStorage.setItem(`chat_selected_resume_${user.id}`, updatedResumes[0].id);
+            setMessages([]);
+          } else {
+            // No resumes left
+            setCurrentChatId(null);
+            setSelectedResumeId(null);
+            localStorage.removeItem(`chat_selected_resume_${user.id}`);
+            setMessages([]);
+          }
+        } else if (selectedResumeId === resumeId) {
+          // If selected resume was deleted but not the current chat
+          if (updatedResumes.length > 0) {
+            setSelectedResumeId(updatedResumes[0].id);
+            localStorage.setItem(`chat_selected_resume_${user.id}`, updatedResumes[0].id);
+          } else {
+            setSelectedResumeId(null);
+            localStorage.removeItem(`chat_selected_resume_${user.id}`);
+          }
+        }
+        
+        // Broadcast update to other tabs/windows
+        if (typeof BroadcastChannel !== 'undefined') {
+          const channel = new BroadcastChannel('resume-updates');
+          channel.postMessage({ 
+            type: 'RESUME_DELETED', 
+            data: { resumeId, deletedResume: resumeToDelete }
+          });
+        }
+        
+      } finally {
+        await loadResumes(false);
       }
-      
-    } catch (error) {
-      console.error('Error deleting resume:', error);
-      
-      // Handle authentication errors by redirecting
-      if (error.response?.status === 401) {
-        localStorage.removeItem('token');
-        window.location.reload();
-        return;
-      }
-      
-      // For all other errors, silently fail and log
-      console.error('Delete failed silently:', {
-        status: error.response?.status,
-        message: error.response?.data?.message || error.message,
-        resumeId,
-        fileName: resumeToDelete.fileName
-      });
-    } finally {
-      await loadResumes(false); // Silently reload resumes after delete attempt
-    }
+    });
+    setShowConfirmDialog(true);
   };
 
   const handleSendMessage = async (message) => {
@@ -1220,6 +1210,17 @@ export default function Chat() {
         <div 
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Render ConfirmationDialog */}
+      {showConfirmDialog && (
+        <ConfirmationDialog
+          message={confirmDialogMessage}
+          onConfirm={confirmDialogAction}
+          onCancel={() => setShowConfirmDialog(false)}
+          confirmText="Delete"
+          cancelText="Cancel"
         />
       )}
     </div>
