@@ -17,6 +17,7 @@ import Navigation from './common/Navigation';
 import { Upload, FileText, Trash2, AlertCircle, ChevronDown, Plus, MessageSquare, Menu, X } from 'lucide-react';
 
 const MAX_USER_MESSAGES_PER_CHAT = 10; // Only count user messages, not bot responses
+const MAX_ACTIVE_CHATS = 5; // Maximum number of active chats a user can have
 
 export default function Chat() {
   const { user } = useAuth();
@@ -361,6 +362,12 @@ export default function Chat() {
       return;
     }
 
+    // Check if user has reached the maximum number of active chats
+    if (chatSessions.length >= MAX_ACTIVE_CHATS) {
+      alert(`You've reached the maximum limit of ${MAX_ACTIVE_CHATS} active chats. Please delete an existing chat before creating a new one.`);
+      return;
+    }
+
     setIsCreatingChat(true);
 
     try {
@@ -559,17 +566,27 @@ export default function Chat() {
 
     if (file.type !== 'application/pdf') {
       console.warn('Invalid file type: Please upload a PDF file only.');
+      alert('Please upload a PDF file only.');
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
       console.warn('File size too large: File size must be less than 10MB.');
+      alert('File size too large: File size must be less than 10MB.');
       return;
     }
     
     // Check resume limit
     if (resumes.length >= 3) {
       console.warn('Maximum resume limit reached (3/3)');
+      alert('Maximum resume limit reached (3/3). Please delete an existing resume before uploading a new one.');
+      return;
+    }
+    
+    // Check chat limit since uploading a resume automatically creates a new chat
+    if (chatSessions.length >= MAX_ACTIVE_CHATS) {
+      console.warn(`Maximum chat limit reached (${MAX_ACTIVE_CHATS}/${MAX_ACTIVE_CHATS})`);
+      alert(`You've reached the maximum limit of ${MAX_ACTIVE_CHATS} active chats. Please delete an existing chat before uploading a new resume.`);
       return;
     }
 
@@ -863,6 +880,9 @@ export default function Chat() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            <div className="text-xs text-gray-400 mb-2">
+              Active Chats: {chatSessions.length}/{MAX_ACTIVE_CHATS}
+            </div>
 
             {/* Resume Selection Dropdown */}
             <div className="mb-3">
@@ -902,16 +922,25 @@ export default function Chat() {
             {/* New Chat Button */}
             <button
               onClick={createNewChat}
-              disabled={isCreatingChat}
+              disabled={isCreatingChat || chatSessions.length >= MAX_ACTIVE_CHATS}
               className="w-full flex items-center justify-center space-x-2 p-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-sm transition-colors"
             >
               <Plus className="w-4 h-4" />
-              <span>{isCreatingChat ? 'Creating...' : 'New Chat'}</span>
+              <span>
+                {isCreatingChat ? 'Creating...' : 
+                 chatSessions.length >= MAX_ACTIVE_CHATS ? 'Chat Limit Reached' : 'New Chat'}
+              </span>
             </button>
             
             {resumes.length === 0 && (
               <div className="mt-2 text-xs text-gray-400 text-center">
                 No resume selected - general chat mode
+              </div>
+            )}
+            
+            {chatSessions.length >= MAX_ACTIVE_CHATS && (
+              <div className="mt-2 text-xs text-red-400 text-center">
+                You've reached the maximum limit of {MAX_ACTIVE_CHATS} active chats. Please delete an existing chat to create a new one.
               </div>
             )}
           </div>
