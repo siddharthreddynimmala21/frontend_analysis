@@ -485,7 +485,10 @@ export default function Chat() {
         localStorage.setItem(`chat_selected_resume_${user.id}`, finalResumeId);
       }
       
-      setMessages([initialMessage]);
+      // Set initial message with a slight delay to ensure it persists
+      setTimeout(() => {
+        setMessages([initialMessage]);
+      }, 100);
       
       // Save to localStorage
       localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
@@ -531,27 +534,40 @@ export default function Chat() {
       try {
         const history = await getChatHistory(chatId);
         if (history && history.length > 0) {
-          setMessages(history);
+          // Use setTimeout to ensure messages are properly rendered
+          setTimeout(() => {
+            setMessages(history);
+          }, 100);
         } else {
           // If no history is found, initialize with a welcome message
           const selectedResume = resumes.find(r => resumeExists ? r.id === session.resumeId : r.id === resumes[0].id);
-          setMessages([{
+          const initialMessage = {
             text: `Hi! I'm your resume analysis assistant. I can help you with your resume: ${selectedResume?.fileName || 'Resume'}. How can I assist you today?`,
             isBot: true,
             isSystem: true,
             timestamp: new Date()
-          }]);
+          };
+          
+          // Use setTimeout to ensure message is properly rendered
+          setTimeout(() => {
+            setMessages([initialMessage]);
+          }, 100);
         }
       } catch (error) {
         console.error('Error loading chat history when switching chats:', error);
         // Initialize with a welcome message if there's an error
         const selectedResume = resumes.find(r => resumeExists ? r.id === session.resumeId : r.id === resumes[0].id);
-        setMessages([{
+        const initialMessage = {
           text: `Hi! I'm your resume analysis assistant. I can help you with your resume: ${selectedResume?.fileName || 'Resume'}. How can I assist you today?`,
           isBot: true,
           isSystem: true,
           timestamp: new Date()
-        }]);
+        };
+        
+        // Use setTimeout to ensure message is properly rendered
+        setTimeout(() => {
+          setMessages([initialMessage]);
+        }, 100);
       }
     }
   };
@@ -912,7 +928,9 @@ export default function Chat() {
       y: 0,
       transition: {
         duration: 0.4,
-        ease: "easeOut"
+        ease: "easeOut",
+        // Ensure animation completes
+        when: "beforeChildren"
       }
     }
   };
@@ -1176,8 +1194,9 @@ export default function Chat() {
                     <motion.div
                       key={index}
                       variants={messageVariants}
-                      initial="hidden"
+                      initial="visible" // Changed from "hidden" to "visible" to prevent disappearing
                       animate="visible"
+                      exit="visible" // Added exit animation state
                     >
                       <ChatMessage
                         message={message.text}
