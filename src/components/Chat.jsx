@@ -414,15 +414,15 @@ export default function Chat() {
       console.log('Chat creation already in progress, ignoring request');
       return;
     }
-
+  
     // Check if user has reached the maximum number of active chats
     if (chatSessions.length >= MAX_ACTIVE_CHATS) {
       alert(`You've reached the maximum limit of ${MAX_ACTIVE_CHATS} active chats. Please delete an existing chat before creating a new one.`);
       return;
     }
-
+  
     setIsCreatingChat(true);
-
+  
     try {
       // Determine the resume to use for the new chat
       let finalResumeId = selectedResumeId;
@@ -457,7 +457,7 @@ export default function Chat() {
         finalResumeId = null;
         console.log('Creating general chat without resume');
       }
-
+  
       // Generate unique chat ID
       const newChatId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
@@ -466,14 +466,14 @@ export default function Chat() {
         resumeId: finalResumeId,
         resumeName: selectedResume?.fileName || null,
         name: chatName,
-        lastMessage: '',
+        lastMessage: initialMessage.text.substring(0, 50) + (initialMessage.text.length > 50 ? '...' : ''),
         messageCount: 1, // Start with 1 for the initial message
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         lastActivity: new Date(),
         isGeneralChat: !finalResumeId // Flag to indicate this is a general chat
       };
-
+  
       // Update state
       const updatedSessions = [newSession, ...chatSessions];
       setChatSessions(updatedSessions);
@@ -485,18 +485,26 @@ export default function Chat() {
         localStorage.setItem(`chat_selected_resume_${user.id}`, finalResumeId);
       }
       
-      // Set initial message with a slight delay to ensure it persists
-      setTimeout(() => {
-        setMessages([initialMessage]);
-      }, 100);
+      // Set initial message immediately
+      setMessages([initialMessage]);
       
       // Save to localStorage
       localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
       
-      // Save to database after a short delay to ensure state is updated
-      setTimeout(() => {
-        saveChatHistoryToDatabase();
-      }, 500);
+      // Save to database immediately to ensure persistence
+      (async () => {
+        try {
+          await saveChatHistory({
+            chatId: newChatId,
+            resumeId: finalResumeId || 'general', // Use 'general' as fallback for empty chats
+            chatName: chatName,
+            messages: [initialMessage]
+          });
+          console.log('New chat saved to database successfully');
+        } catch (error) {
+          console.error('Error saving new chat to database:', error);
+        }
+      })();
       
       console.log('New chat created:', newChatId, finalResumeId ? `with resume: ${selectedResume.fileName}` : 'as general chat');
     } finally {
@@ -601,7 +609,6 @@ export default function Chat() {
             setSelectedResumeId(nextChat.resumeId);
             localStorage.setItem(`chat_selected_resume_${user.id}`, nextChat.resumeId);
           } else if (resumes.length > 0) {
-            // If the resume doesn't exist anymore, use the first available one
             setSelectedResumeId(resumes[0].id);
             localStorage.setItem(`chat_selected_resume_${user.id}`, resumes[0].id);
           }
