@@ -198,6 +198,25 @@ export const checkHasResume = async () => {
   }
 };
 
+// Function to calculate the mean of an array using Python backend
+export const calculateArrayMean = async (name, numbers) => {
+  try {
+    console.log('API: Sending array mean calculation request...');
+    const response = await api.get('/api/python/hello', {
+      params: {
+        name,
+        numbers
+      }
+    });
+    
+    console.log('API: Array mean calculation response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error calculating array mean:', error);
+    throw error;
+  }
+};
+
 export const deleteResumeData = async () => {
   try {
     const response = await api.delete('/api/chat/resume-data');
@@ -290,7 +309,7 @@ export const uploadResume = async (formData) => {
 /**
  * Upload and analyze resume PDF with AI
  * Extracts structured information (work experience, education, skills)
- * @param {FormData} formData - FormData containing the PDF file
+ * @param {FormData} formData - FormData containing the PDF file, currentRole, targetRole, experience, and jobDescription
  * @returns {Promise<Object>} Structured resume analysis
  */
 export const analyzeResume = async (formData) => {
@@ -303,9 +322,12 @@ export const analyzeResume = async (formData) => {
     }
 
     // Use the configured API base URL instead of relative URL
-    const response = await fetch(`${API_BASE_URL}/api/resume/analyze`, {
+    const response = await fetch(`${API_BASE_URL}/api/python/analyze-resume`, {
       method: 'POST',
       body: formData,
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
     });
 
     // Log the full response details
@@ -614,3 +636,5 @@ export const analyzeWorkExperience = async (formData) => {
     throw error;
   }
 };
+
+// The analyzeResume function is already defined earlier in this file

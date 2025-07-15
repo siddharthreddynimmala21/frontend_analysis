@@ -9,6 +9,8 @@ import Chat from './components/Chat';
 import Dashboard from './components/Dashboard';
 import ResumeAnalysis from './components/ResumeAnalysis';
 import UploadResume from './components/UploadResume';
+import ArrayMean from './components/ArrayMean';
+import ResumeAnalyzer from './components/ResumeAnalyzer';
 import ForgotPassword from './components/auth/ForgotPassword';
 
 function App() {
@@ -50,6 +52,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <UploadResume />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/array-mean"
+            element={
+              <ProtectedRoute>
+                <ArrayMean />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resume-analyzer"
+            element={
+              <ProtectedRoute>
+                <ResumeAnalyzer />
               </ProtectedRoute>
             }
           />
