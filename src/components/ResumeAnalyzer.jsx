@@ -74,6 +74,11 @@ export default function ResumeAnalyzer() {
       formData.append('targetRole', targetRole);
       formData.append('experience', experience);
       formData.append('jobDescription', jobDescription);
+      // Include the JWT token for backend validation
+      const token = localStorage.getItem('token');
+      if (token) {
+        formData.append('token', token);
+      }
 
       // Send request to backend using the API service
       const response = await analyzeResume(formData);
@@ -273,16 +278,10 @@ export default function ResumeAnalyzer() {
               transition={{ duration: 0.5 }}
             >
               <h3 className="text-lg font-semibold mb-4">Analysis Results</h3>
-              <div className="bg-white/10 rounded-lg p-4 overflow-auto max-h-[500px]">
-                <div className="prose prose-invert prose-sm max-w-none">
-                  <div dangerouslySetInnerHTML={{ 
-                    __html: result.message.replace(/\n/g, '<br>').replace(/#{1,6}\s([^\n]+)/g, (match, p1, offset, string) => {
-                      const level = match.trim()[0] === '#' ? match.trim().indexOf(' ') : 1;
-                      return `<h${level} class="text-${level === 1 ? 'xl' : level === 2 ? 'lg' : 'base'} font-bold mt-4 mb-2">${p1}</h${level}>`;
-                    }).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/---/g, '<hr class="my-4 border-white/20">')
-                  }}></div>
-                </div>
-              </div>
+              {/* Render markdown as plain text without heading markers */}
+              <pre className="whitespace-pre-wrap text-sm text-white">
+                {result.message.replace(/^#+\s+/gm, '')}
+              </pre>
             </motion.div>
           )}
         </motion.div>
