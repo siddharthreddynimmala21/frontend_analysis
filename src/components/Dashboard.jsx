@@ -39,7 +39,7 @@ export default function Dashboard() {
         >
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-6 sm:mb-12">Welcome to ResumeRefiner Pro+</h1>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-3xl mx-auto">
             {/* AI Chat Card */}
             <motion.div
               className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/20 transition-all duration-100 cursor-pointer"
@@ -59,24 +59,6 @@ export default function Dashboard() {
               </div>
             </motion.div>
 
-            {/* AI Resume Analysis Card */}
-            <motion.div
-              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/20 transition-all duration-100 cursor-pointer"
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/upload-resume')}
-            >
-              <div className="p-4 sm:p-6 lg:p-8">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
-                  <Briefcase className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold mb-2">AI Resume Analysis</h2>
-                <p className="text-sm sm:text-base text-gray-300">Get detailed feedback on your resume with AI-powered analysis and improvement suggestions.</p>
-              </div>
-            </motion.div>
 
             {/* Resume Analyzer Card */}
             <motion.div
@@ -93,7 +75,7 @@ export default function Dashboard() {
                   <FileSearch className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold mb-2">Resume Analyzer</h2>
-                <p className="text-sm sm:text-base text-gray-300">Analyze your resume against job descriptions and get AI-powered improvement suggestions.</p>
+                <p className="text-sm sm:text-base text-gray-300">Analyze your resume against job descriptions and get AI-powered suggestions.</p>
               </div>
             </motion.div>
           </div>

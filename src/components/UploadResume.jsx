@@ -412,6 +412,20 @@ export default function UploadResume() {
   const [workExpAnalysis, setWorkExpAnalysis] = useState(null);
   const [isWorkExpLoading, setIsWorkExpLoading] = useState(false);
   
+  // Loading overlay component
+  const LoadingOverlay = () => (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full text-center">
+        <div className="w-16 h-16 border-4 border-t-transparent border-blue-600 rounded-full animate-spin mx-auto mb-6"></div>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Analyzing Your Resume</h3>
+        <p className="text-gray-600 dark:text-gray-300">
+          This may take a few moments.<br />
+          Feel free to close the application — we'll email your personalized Resume Analysis Report shortly!
+        </p>
+      </div>
+    </div>
+  );
+  
   const INDUSTRIES = [
     'Software', 'Finance', 'Healthcare', 'Education', 'Marketing', 'Sales', 'Engineering', 'Other'
   ];
@@ -551,6 +565,9 @@ export default function UploadResume() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white p-2 sm:p-4 lg:p-8">
       {/* Navbar at the very top */}
       <Navigation showBack={true} />
+      
+      {/* Loading Overlay */}
+      {isProcessing && <LoadingOverlay />}
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center w-full mt-16 sm:mt-6">
@@ -811,7 +828,7 @@ export default function UploadResume() {
                 {isProcessing ? (
                   <div className="flex items-center space-x-1 sm:space-x-2">
                     <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
-                    <span>Analyzing...</span>
+                    <span>Analyzing Resume...</span>
                   </div>
                 ) : (
                   'Analyze Resume'

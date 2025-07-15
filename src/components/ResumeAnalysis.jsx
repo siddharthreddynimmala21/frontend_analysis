@@ -15,6 +15,20 @@ export default function ResumeAnalysis() {
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState(null);
   const [analysisType, setAnalysisType] = useState(initialType); // 'ai' or 'text'
+  
+  // Loading overlay component
+  const LoadingOverlay = () => (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full text-center">
+        <div className="w-16 h-16 border-4 border-t-transparent border-blue-600 rounded-full animate-spin mx-auto mb-6"></div>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Analyzing Your Resume</h3>
+        <p className="text-gray-600 dark:text-gray-300">
+          This may take a few moments.<br />
+          Feel free to close the application — we'll email your personalized Resume Analysis Report shortly!
+        </p>
+      </div>
+    </div>
+  );
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
@@ -252,6 +266,10 @@ export default function ResumeAnalysis() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
       <Navigation />
+      
+      {/* Loading Overlay */}
+      {isLoading && <LoadingOverlay />}
+      
       <div className="container mx-auto px-4 mt-32">
         <motion.div 
           variants={containerVariants}
@@ -343,4 +361,4 @@ export default function ResumeAnalysis() {
       </div>
     </div>
   );
-} 
+}

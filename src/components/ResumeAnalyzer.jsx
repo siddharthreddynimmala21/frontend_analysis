@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Upload, Briefcase } from 'lucide-react';
+import { FileText, Upload, Briefcase, Wand2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Navigation from './common/Navigation';
 import toast from 'react-hot-toast';
@@ -16,6 +16,7 @@ export default function ResumeAnalyzer() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [jobDescriptionOption, setJobDescriptionOption] = useState('paste'); // 'paste' or 'generate'
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -57,7 +58,7 @@ export default function ResumeAnalyzer() {
       return;
     }
 
-    if (!jobDescription.trim()) {
+    if (jobDescriptionOption === 'paste' && !jobDescription.trim()) {
       setError('Please enter the job description');
       toast.error('Please enter the job description');
       return;
@@ -74,6 +75,7 @@ export default function ResumeAnalyzer() {
       formData.append('targetRole', targetRole);
       formData.append('experience', experience);
       formData.append('jobDescription', jobDescription);
+      formData.append('generateJobDescription', jobDescriptionOption === 'generate' ? 'true' : 'false');
       // Include the JWT token for backend validation
       const token = localStorage.getItem('token');
       if (token) {
@@ -130,15 +132,37 @@ export default function ResumeAnalyzer() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 to-black text-white p-4">
       <Navigation showBack={true} />
       
+      {/* Loading Overlay */}
+      {isLoading && (
+        <motion.div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <div className="flex justify-center mb-6">
+              <svg className="animate-spin h-12 w-12 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold mb-4">Analyzing Your Resume</h3>
+            <p className="text-gray-300 mb-6">This may take a few moments.</p>
+            <p className="text-gray-300 font-medium">Feel free to close the application — we'll email your personalized Resume Analysis Report shortly!</p>
+          </div>
+        </motion.div>
+      )}
+      
       <motion.div 
         className="flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto mt-16"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
-        <h1 className="text-3xl md:text-4xl font-bold text-center mb-8">Resume Analyzer</h1>
+        <h1 className="text-3xl md:text-4xl font-bold text-center mb-8 mt-10">Resume Analyzer</h1>
         
-        <motion.div 
+        <motion.div
           className="w-full bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-6 md:p-8"
           variants={cardVariants}
         >
@@ -239,18 +263,60 @@ export default function ResumeAnalyzer() {
             </div>
             
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" htmlFor="jobDescription">
+              <label className="block text-sm font-medium mb-2" htmlFor="jobDescriptionOption">
                 Job Description
               </label>
-              <textarea
-                id="jobDescription"
-                rows="5"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
-                placeholder="Paste the job description here..."
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-                disabled={isLoading}
-              ></textarea>
+              
+              <div className="flex space-x-4 mb-4">
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    className="form-radio h-4 w-4 text-purple-600"
+                    name="jobDescriptionOption"
+                    value="paste"
+                    checked={jobDescriptionOption === 'paste'}
+                    onChange={() => setJobDescriptionOption('paste')}
+                    disabled={isLoading}
+                  />
+                  <span className="ml-2 text-sm">Paste Job Description</span>
+                </label>
+                
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    className="form-radio h-4 w-4 text-purple-600"
+                    name="jobDescriptionOption"
+                    value="generate"
+                    checked={jobDescriptionOption === 'generate'}
+                    onChange={() => setJobDescriptionOption('generate')}
+                    disabled={isLoading}
+                  />
+                  <span className="ml-2 text-sm">Generate Job Description</span>
+                </label>
+              </div>
+              
+              {jobDescriptionOption === 'paste' ? (
+                <textarea
+                  id="jobDescription"
+                  rows="5"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                  placeholder="Paste the job description here..."
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  disabled={isLoading}
+                ></textarea>
+              ) : (
+                <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex items-center">
+                  <Wand2 className="w-5 h-5 text-purple-400 mr-3" />
+                  <p className="text-sm text-gray-300">
+                    We'll generate a job description based on your target role and experience.
+                    <br />
+                    <span className="text-xs text-gray-400 mt-1 block">
+                      This will be used for analysis.
+                    </span>
+                  </p>
+                </div>
+              )}
             </div>
             
             <button

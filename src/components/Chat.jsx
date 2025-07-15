@@ -1044,9 +1044,15 @@ export default function Chat() {
                     />
                   </label>
                   {isUploading && (
-                    <div className="flex items-center justify-center space-x-2 text-blue-400 mt-4">
-                      <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-sm">Processing...</span>
+                    <div className="flex flex-col items-center justify-center space-y-2 text-blue-400 mt-4">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-sm">Processing...</span>
+                      </div>
+                      <p className="text-xs text-gray-300 mt-2 max-w-xs">
+                        This may take a few moments.
+                        Feel free to close the application — we'll email your personalized Resume Analysis Report shortly!
+                      </p>
                     </div>
                   )}
 
