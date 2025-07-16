@@ -30,7 +30,7 @@ export default function Dashboard() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white p-2 sm:p-4 lg:p-8">
       <Navigation showBack={false} />
       
-      <div className="flex-1 flex flex-col items-center justify-center w-full mt-6">
+      <div className="flex-1 flex flex-col items-center justify-center w-full -mt-8 sm:mt-6">
         <motion.div
           className="w-full max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 mt-16 sm:mt-8"
           initial={{ opacity: 0, y: 20 }}

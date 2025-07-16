@@ -155,15 +155,14 @@ export default function ResumeAnalyzer() {
       )}
       
       <motion.div 
-        className="flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto mt-16"
+        className="flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto mt-6 sm:mt-16"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
-        <h1 className="text-3xl md:text-4xl font-bold text-center mb-8 mt-10">Resume Analyzer</h1>
         
         <motion.div
-          className="w-full bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-6 md:p-8"
+          className="w-full bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-6 md:p-8 mt-12"
           variants={cardVariants}
         >
           <div className="mb-6 flex items-center">

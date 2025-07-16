@@ -32,12 +32,14 @@ export default function Navigation({ showBack = false, setSidebarOpen }) {
       <nav className={navClasses}>
         {/* Left: Logo and App Name */}
         <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer select-none">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-1 hover:bg-white/10 rounded"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          {isChatPage && setSidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-1 hover:bg-white/10 rounded"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
 
           <div
             onClick={() => navigate('/dashboard')}
