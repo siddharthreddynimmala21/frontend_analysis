@@ -46,9 +46,7 @@ export default function Navigation({ showBack = false, setSidebarOpen }) {
             className="flex items-center space-x-2 sm:space-x-3 cursor-pointer select-none"
           >
             <div className="w-8 h-8 sm:w-12 sm:h-12 flex items-center justify-center">
-              <div className="w-7 h-7 sm:w-10 sm:h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <div className="w-3 h-3 sm:w-5 sm:h-5 bg-white rounded-md transform rotate-12"></div>
-              </div>
+              <img src="/assets/Resume_Refiner.png" alt="ResumeRefiner Logo" className="w-full h-full object-contain rounded-lg" />
             </div>
             <span className="text-lg sm:text-2xl font-semibold tracking-tight">ResumeRefiner Pro+</span>
           </div>

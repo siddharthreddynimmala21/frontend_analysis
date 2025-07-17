@@ -57,8 +57,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white px-4 py-12">
       <div className="w-full max-w-md shadow-2xl border border-white/30 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl">
         <div className="text-center space-y-4 p-8 sm:p-10">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-            <div className="w-8 h-8 bg-white rounded-sm transform rotate-12"></div>
+          <div className="mx-auto w-16 h-16 flex items-center justify-center">
+            <img src="/assets/Resume_Refiner.png" alt="ResumeRefiner Logo" className="w-full h-full object-contain rounded-lg" />
           </div>
           <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
             ResumeRefiner Pro+
