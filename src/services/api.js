@@ -638,3 +638,5 @@ export const analyzeWorkExperience = async (formData) => {
 };
 
 // The analyzeResume function is already defined earlier in this file
+
+export { API_BASE_URL };

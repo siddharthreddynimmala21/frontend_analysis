@@ -12,6 +12,7 @@ import UploadResume from './components/UploadResume';
 import ArrayMean from './components/ArrayMean';
 import ResumeAnalyzer from './components/ResumeAnalyzer';
 import ForgotPassword from './components/auth/ForgotPassword';
+import AIInterview from './components/AIInterview';
 
 function App() {
   return (
@@ -68,6 +69,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ResumeAnalyzer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ai-interview"
+            element={
+              <ProtectedRoute>
+                <AIInterview />
               </ProtectedRoute>
             }
           />
