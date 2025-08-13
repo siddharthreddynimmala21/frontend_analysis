@@ -23,11 +23,26 @@ export default function AIInterview() {
   const [showFullReport, setShowFullReport] = useState(false);
   const [currentRound, setCurrentRound] = useState(1);
   const [roundHistory, setRoundHistory] = useState([]);
+  const [sessionId, setSessionId] = useState(null); // Store session ID for reuse across rounds
+  // Session ID Management:
+  // - Round 1: Generate new session ID (backend creates new interview)
+  // - Rounds 2-4: Reuse existing session ID (backend adds rounds to existing interview)
+  // - New Interview: Reset session ID to null (forces new session creation)
 
   // Debug answers state changes
   useEffect(() => {
     console.log('Answers state updated:', answers);
   }, [answers]);
+
+  // Debug session ID changes
+  useEffect(() => {
+    console.log('Session ID updated:', sessionId);
+  }, [sessionId]);
+
+  // Debug current round changes
+  useEffect(() => {
+    console.log('Current round updated:', currentRound);
+  }, [currentRound]);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -71,13 +86,22 @@ export default function AIInterview() {
     setIsLoading(true);
     setError(null);
     setResult(null);
+
+    // Reset session ID and round history for new interview
+    setSessionId(null);
+    setCurrentRound(1);
+    setRoundHistory([]);
+    setAnswers({ mcq: {}, desc: {} });
+    setValidation(null);
+    setAnswersSubmitted(false);
     try {
       const formData = new FormData();
       formData.append('resume', selectedFile);
       formData.append('currentRole', currentRole);
       formData.append('targetRole', targetRole);
       formData.append('experience', experience);
-      formData.append('jobDescription', jobDescription);
+      formData.append('jobDescription', jobDescriptionOption === 'paste' ? jobDescription : '');
+      formData.append('jobDescriptionOption', jobDescriptionOption);
       const token = localStorage.getItem('token');
       // Use the correct API endpoint
       const response = await fetch(`${API_BASE_URL}/api/ai-interview/start`, {
@@ -105,6 +129,10 @@ export default function AIInterview() {
         throw new Error(data?.message || data?.error || 'Failed to start interview practice.');
       }
       setResult(data);
+      // Store session ID for subsequent rounds
+      if (data.sessionId) {
+        setSessionId(data.sessionId);
+      }
       toast.success('Interview practice started!');
     } catch (err) {
       console.error('AI Interview error:', err);
@@ -146,8 +174,14 @@ export default function AIInterview() {
       formData.append('currentRole', currentRole);
       formData.append('targetRole', targetRole);
       formData.append('experience', experience);
-      formData.append('jobDescription', jobDescription);
+      formData.append('jobDescription', jobDescriptionOption === 'paste' ? jobDescription : '');
+      formData.append('jobDescriptionOption', jobDescriptionOption);
       formData.append('round', nextRound.toString()); // Add round parameter
+
+      // Pass existing session ID for subsequent rounds
+      if (sessionId) {
+        formData.append('sessionId', sessionId);
+      }
 
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/ai-interview/start`, {
@@ -179,7 +213,11 @@ export default function AIInterview() {
       }
 
       setResult(data);
-      toast.success(`Technical Round ${nextRound} started!`);
+      // Ensure we keep the same session ID (should be the same as what we sent)
+      if (data.sessionId && data.sessionId !== sessionId) {
+        console.warn('Session ID mismatch detected:', { sent: sessionId, received: data.sessionId });
+      }
+      toast.success(`${getRoundName(nextRound)} started!`);
 
     } catch (err) {
       console.error('Next round error:', err);
@@ -293,6 +331,9 @@ export default function AIInterview() {
             <div>
               <h2 className="text-xl font-bold">AI Interview Practice</h2>
               <p className="text-sm text-gray-400">{getRoundName(currentRound)}</p>
+              {sessionId && (
+                <p className="text-xs text-gray-500 mt-1">Session: {sessionId.slice(-8)}</p>
+              )}
               {roundHistory.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {roundHistory.map((round, idx) => (
@@ -566,9 +607,18 @@ export default function AIInterview() {
                       // Log the data being sent
                       console.log('Submitting answers:', {
                         sessionId: result.sessionId,
+                        storedSessionId: sessionId,
                         round: result.round,
                         answers: answers
                       });
+
+                      // Validate session ID consistency
+                      if (sessionId && result.sessionId !== sessionId) {
+                        console.warn('Session ID mismatch detected during submission:', {
+                          stored: sessionId,
+                          fromResult: result.sessionId
+                        });
+                      }
 
                       // Check if answers have content
                       const hasMcqAnswers = Object.keys(answers.mcq).length > 0;
@@ -809,6 +859,31 @@ export default function AIInterview() {
                       Congratulations! You have completed all 4 rounds of the interview process.
                     </p>
                   </div>
+                )}
+
+                {/* Start New Interview Button - Show after completing any round */}
+                {validation && (
+                  <button
+                    onClick={() => {
+                      // Reset all states for a completely new interview
+                      setSessionId(null);
+                      setCurrentRound(1);
+                      setRoundHistory([]);
+                      setAnswers({ mcq: {}, desc: {} });
+                      setValidation(null);
+                      setAnswersSubmitted(false);
+                      setResult(null);
+                      setShowFullReport(false);
+                      toast.success('Ready to start a new interview!');
+                    }}
+                    disabled={isLoading}
+                    className="py-3 px-6 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 rounded-lg font-medium transition-all duration-200 flex items-center mx-auto disabled:opacity-60 mt-4"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Start New Interview
+                  </button>
                 )}
               </div>
 
