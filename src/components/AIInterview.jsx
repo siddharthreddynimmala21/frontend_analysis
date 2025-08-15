@@ -263,6 +263,53 @@ export default function AIInterview() {
     return false;
   };
 
+  const checkInterviewCompletion = (validationData, round) => {
+    const isInterviewComplete =
+      round === 4 || // Completed all rounds
+      (round <= 2 && validationData.verdict === 'Fail') || // Failed technical round
+      round === 3; // Completed managerial round (can proceed to HR or end)
+
+    if (isInterviewComplete) {
+      // Trigger report sending (don't wait for it)
+      sendInterviewReport().catch(error => {
+        console.error('Error sending interview report:', error);
+        // Don't show error to user as this is background process
+      });
+    }
+  };
+
+  const sendInterviewReport = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token || !sessionId) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/interview-report/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          sessionId: sessionId
+          // Email will be automatically fetched from user ID on backend
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success('Interview report has been sent to your email!');
+        console.log('Report sent successfully:', data.reportSummary);
+      } else {
+        console.error('Failed to send report:', data.error);
+        toast.error(data.message || 'Failed to send report');
+      }
+    } catch (error) {
+      console.error('Error sending interview report:', error);
+      toast.error('Failed to send interview report');
+    }
+  };
+
   const containerVariants = {
     hidden: { opacity: 0, scale: 0.95 },
     visible: {
@@ -705,6 +752,9 @@ export default function AIInterview() {
                       setValidation(validationData);
                       toast.success(`Validation complete! Verdict: ${validationData.verdict}`);
 
+                      // Check if interview should be completed and trigger report
+                      checkInterviewCompletion(validationData, result.round);
+
                     } catch (err) {
                       console.error('Submit/Validation error:', err);
                       toast.error(err.message || 'Submit/Validation failed');
@@ -859,6 +909,20 @@ export default function AIInterview() {
                       Congratulations! You have completed all 4 rounds of the interview process.
                     </p>
                   </div>
+                )}
+
+                {/* Send Report Button - Show after completing any round */}
+                {validation && sessionId && (
+                  <button
+                    onClick={sendInterviewReport}
+                    disabled={isLoading}
+                    className="py-3 px-6 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-lg font-medium transition-all duration-200 flex items-center mx-auto disabled:opacity-60 mt-4"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Email Interview Report
+                  </button>
                 )}
 
                 {/* Start New Interview Button - Show after completing any round */}
