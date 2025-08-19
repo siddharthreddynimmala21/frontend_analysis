@@ -24,15 +24,18 @@ export default function AIInterview() {
   const [currentRound, setCurrentRound] = useState(1);
   const [roundHistory, setRoundHistory] = useState([]);
   const [sessionId, setSessionId] = useState(null); // Store session ID for reuse across rounds
+  // Single-question pagination state
+  const [flatQuestions, setFlatQuestions] = useState([]); // [{ type: 'mcq'|'desc', q, idx }]
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  // Navigation protection during exam
+  const [protectNavigation, setProtectNavigation] = useState(false);
+  // Two-step flow: setup view -> exam view
+  const [inExamMode, setInExamMode] = useState(false);
+
   // Session ID Management:
   // - Round 1: Generate new session ID (backend creates new interview)
   // - Rounds 2-4: Reuse existing session ID (backend adds rounds to existing interview)
   // - New Interview: Reset session ID to null (forces new session creation)
-
-  // Debug answers state changes
-  useEffect(() => {
-    console.log('Answers state updated:', answers);
-  }, [answers]);
 
   // Debug session ID changes
   useEffect(() => {
@@ -43,6 +46,179 @@ export default function AIInterview() {
   useEffect(() => {
     console.log('Current round updated:', currentRound);
   }, [currentRound]);
+
+  // Build a flat questions array for single-question navigation when results change
+  useEffect(() => {
+    if (!result?.questions) {
+      setFlatQuestions([]);
+      setCurrentQuestionIndex(0);
+      return;
+    }
+    let flat = [];
+    if (Array.isArray(result.questions)) {
+      // Fallback: treat array as descriptive questions
+      flat = result.questions.map((q, i) => ({ type: 'desc', q, idx: i }));
+    } else {
+      const mcqList = (result.questions.mcq_questions || []).map((item, i) => ({ type: 'mcq', q: item, idx: i }));
+      const descList = (result.questions.desc_questions || []).map((q, i) => ({ type: 'desc', q, idx: i }));
+      flat = [...mcqList, ...descList];
+    }
+    setFlatQuestions(flat);
+    setCurrentQuestionIndex(0);
+    setProtectNavigation(true);
+  }, [result]);
+
+  // Enable/disable navigation protection based on exam state
+  useEffect(() => {
+    const shouldProtect = !!result?.questions && !answersSubmitted;
+    setProtectNavigation(shouldProtect);
+  }, [result, answersSubmitted]);
+
+  // Warn user on reload/close
+  useEffect(() => {
+    const beforeUnloadHandler = (e) => {
+      if (protectNavigation) {
+        e.preventDefault();
+        e.returnValue = 'Are you sure you want to leave? Your progress will be lost.';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }, [protectNavigation]);
+
+  // Intercept browser back navigation within SPA
+  useEffect(() => {
+    if (!protectNavigation) return;
+    const onPopState = () => {
+      const confirmLeave = window.confirm('Are you sure you want to leave? Your progress will be lost.');
+      if (!confirmLeave) {
+        // push back to prevent leaving
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+    // push a state to enable popstate trapping
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [protectNavigation]);
+
+  // Helper: Submit and Validate answers (used by Submit Exam button)
+  const submitAndValidate = async () => {
+    try {
+      // Resolve identifiers robustly
+      const sessionToUse = result?.sessionId || sessionId;
+      const roundToUse = (typeof result?.round !== 'undefined' && result?.round !== null) ? result.round : currentRound;
+      const roundIdToUse = result?.roundId || result?.round_id || null;
+
+      // Log the data being sent
+      console.log('Submitting answers:', {
+        sessionIdFromResult: result?.sessionId,
+        sessionIdFromState: sessionId,
+        sessionIdUsed: sessionToUse,
+        roundFromResult: result?.round,
+        roundFromState: currentRound,
+        roundUsed: roundToUse,
+        roundIdFromResult: result?.roundId || result?.round_id,
+        roundIdUsed: roundIdToUse,
+        answers: answers
+      });
+
+      // Validate session ID consistency
+      if (sessionId && result?.sessionId && result.sessionId !== sessionId) {
+        console.warn('Session ID mismatch detected during submission:', {
+          stored: sessionId,
+          fromResult: result.sessionId
+        });
+      }
+
+      // Ensure required IDs exist
+      if (!sessionToUse) {
+        throw new Error('Missing session ID for submission');
+      }
+      if (typeof roundToUse === 'undefined' || roundToUse === null) {
+        throw new Error('Missing round number for submission');
+      }
+
+      // Check if answers have content
+      const hasMcqAnswers = Object.keys(answers.mcq).length > 0;
+      const hasDescAnswers = Object.keys(answers.desc).length > 0;
+
+      if (!hasMcqAnswers && !hasDescAnswers) {
+        toast.error('Please answer at least one question before submitting');
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+
+      // Step 1: Submit answers
+      const submitRes = await fetch(`${API_BASE_URL}/api/ai-interview/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          sessionId: sessionToUse,
+          round: roundToUse,
+          ...(roundIdToUse ? { roundId: roundIdToUse } : {}),
+          answers,
+        }),
+      });
+
+      const submitResponseData = await submitRes.json();
+      console.log('Submit response:', submitResponseData);
+
+      if (!submitRes.ok) {
+        throw new Error(submitResponseData.error || 'Failed to submit answers');
+      }
+
+      toast.success('Answers submitted successfully!');
+      setAnswersSubmitted(true);
+
+      // Step 2: Automatically start validation
+      setIsValidating(true);
+      toast.loading('Validating your answers...', { duration: 2000 });
+
+      const validateRes = await fetch(`${API_BASE_URL}/api/ai-interview/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          sessionId: sessionToUse,
+          round: roundToUse,
+          ...(roundIdToUse ? { roundId: roundIdToUse } : {}),
+        }),
+      });
+
+      const validateResponseData = await validateRes.json();
+      console.log('Validation response:', validateResponseData);
+
+      if (!validateRes.ok) {
+        throw new Error(validateResponseData.error || 'Failed to validate answers');
+      }
+
+      // Ensure validation has the expected structure with fallbacks for missing data
+      const validationData = {
+        verdict: validateResponseData.validation?.verdict || 'No Verdict',
+        total_score: validateResponseData.validation?.total_score ?? 0,
+        max_possible_score: validateResponseData.validation?.max_possible_score ?? 0,
+        percentage: validateResponseData.validation?.percentage ?? 0,
+        mcq: validateResponseData.validation?.mcq ?? { score: 0, max_score: 0, details: [] },
+        descriptive: validateResponseData.validation?.descriptive ?? { score: 0, max_score: 0, details: [] }
+      };
+
+      setValidation(validationData);
+      toast.success(`Validation complete! Verdict: ${validationData.verdict}`);
+    } catch (err) {
+      console.error('Submit/Validation error:', err);
+      toast.error(err.message || 'Submit/Validation failed');
+    } finally {
+      setIsValidating(false);
+    }
+  };
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -94,6 +270,7 @@ export default function AIInterview() {
     setAnswers({ mcq: {}, desc: {} });
     setValidation(null);
     setAnswersSubmitted(false);
+    setInExamMode(false);
     try {
       const formData = new FormData();
       formData.append('resume', selectedFile);
@@ -128,11 +305,15 @@ export default function AIInterview() {
       if (!response.ok) {
         throw new Error(data?.message || data?.error || 'Failed to start interview practice.');
       }
-      setResult(data);
+      // Ensure round is present on the result for downstream usage
+      const updatedData = { ...data, round: data?.round ?? 1 };
+      setResult(updatedData);
       // Store session ID for subsequent rounds
-      if (data.sessionId) {
-        setSessionId(data.sessionId);
+      if (updatedData.sessionId) {
+        setSessionId(updatedData.sessionId);
       }
+      // Enter exam mode after questions are generated
+      setInExamMode(true);
       toast.success('Interview practice started!');
     } catch (err) {
       console.error('AI Interview error:', err);
@@ -155,17 +336,17 @@ export default function AIInterview() {
       setIsLoading(true);
       setError(null);
 
-      // Reset states for new round
-      setAnswers({ mcq: {}, desc: {} });
-      setAnswersSubmitted(false);
-      setShowFullReport(false);
-
       // Store current round result in history
-      setRoundHistory(prev => [...prev, { round: currentRound, validation }]);
+      setRoundHistory((prev) => [...prev, { round: currentRound, validation }]);
 
       // Move to next round
       const nextRound = currentRound + 1;
       setCurrentRound(nextRound);
+
+      // Reset states for new round (keep exam mode active)
+      setAnswers({ mcq: {}, desc: {} });
+      setAnswersSubmitted(false);
+      setShowFullReport(false);
       setValidation(null);
       setResult(null); // Clear previous questions
 
@@ -212,10 +393,13 @@ export default function AIInterview() {
         throw new Error(data?.message || data?.error || 'Failed to start next round.');
       }
 
-      setResult(data);
+      // Ensure round is present on the result for downstream usage
+      const updatedNext = { ...data, round: data?.round ?? nextRound };
+      setResult(updatedNext);
       // Ensure we keep the same session ID (should be the same as what we sent)
-      if (data.sessionId && data.sessionId !== sessionId) {
-        console.warn('Session ID mismatch detected:', { sent: sessionId, received: data.sessionId });
+      if (updatedNext.sessionId && updatedNext.sessionId !== sessionId) {
+        console.warn('Session ID mismatch detected:', { sent: sessionId, received: updatedNext.sessionId });
+        setSessionId(updatedNext.sessionId);
       }
       toast.success(`${getRoundName(nextRound)} started!`);
 
@@ -358,371 +542,271 @@ export default function AIInterview() {
             </div>
           )}
 
-          {/* Round-specific instructions */}
-          <div className="mb-6 p-4 bg-blue-500/20 border border-blue-500/50 rounded-lg">
-            <h3 className="font-medium mb-2">Round Information:</h3>
-            <p className="text-sm text-blue-200">
-              {currentRound === 1 && "This round focuses on fundamental technical skills and basic concepts. You need 60% to pass."}
-              {currentRound === 2 && "This round covers advanced technical skills, system design, and architecture. You need 60% to pass."}
-              {currentRound === 3 && "This round evaluates your leadership, management, and team handling skills. Any score allows progression to HR round."}
-              {currentRound === 4 && "This is the final round focusing on cultural fit, communication skills, and career goals."}
-            </p>
-          </div>
+          {/* Setup View (shown before starting interview) */}
+          {!inExamMode && (
+            <>
+              {/* Round-specific instructions */}
+              <div className="mb-6 p-4 bg-blue-500/20 border border-blue-500/50 rounded-lg">
+                <h3 className="font-medium mb-2">Round Information:</h3>
+                <p className="text-sm text-blue-200">
+                  {currentRound === 1 && "This round focuses on fundamental technical skills and basic concepts. You need 60% to pass."}
+                  {currentRound === 2 && "This round covers advanced technical skills, system design, and architecture. You need 60% to pass."}
+                  {currentRound === 3 && "This round evaluates your leadership, management, and team handling skills. Any score allows progression to HR round."}
+                  {currentRound === 4 && "This is the final round focusing on cultural fit, communication skills, and career goals."}
+                </p>
+              </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" htmlFor="resume">
-                Upload Resume (PDF)
-              </label>
-              <div className="flex items-center justify-center w-full">
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white/5 border-white/20 hover:bg-white/10">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="w-8 h-8 mb-3 text-gray-400" />
-                    <p className="mb-2 text-sm text-gray-400">
-                      <span className="font-semibold">Click to upload</span> or drag and drop
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      PDF files only (MAX. 10MB)
+              <form onSubmit={handleSubmit}>
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-2" htmlFor="resume">
+                  Upload Resume (PDF)
+                </label>
+                <div className="flex items-center justify-center w-full">
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white/5 border-white/20 hover:bg-white/10">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-3 text-gray-400" />
+                      <p className="mb-2 text-sm text-gray-400">
+                        <span className="font-semibold">Click to upload</span> or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        PDF files only (MAX. 10MB)
+                      </p>
+                    </div>
+                    <input
+                      id="resume"
+                      type="file"
+                      className="hidden"
+                      accept="application/pdf"
+                      onChange={handleFileChange}
+                      disabled={isLoading}
+                    />
+                  </label>
+                </div>
+                {selectedFile && (
+                  <div className="mt-2 flex items-center text-sm text-blue-300">
+                    <FileText className="w-4 h-4 mr-2" />
+                    {selectedFile.name}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2" htmlFor="currentRole">
+                    Current Role
+                  </label>
+                  <input
+                    id="currentRole"
+                    type="text"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                    placeholder="e.g., Software Engineer"
+                    value={currentRole}
+                    onChange={(e) => setCurrentRole(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2" htmlFor="targetRole">
+                    Target Role
+                  </label>
+                  <input
+                    id="targetRole"
+                    type="text"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                    placeholder="e.g., Senior Software Engineer"
+                    value={targetRole}
+                    onChange={(e) => setTargetRole(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-2" htmlFor="experience">
+                  Years of Experience
+                </label>
+                <input
+                  id="experience"
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                  placeholder="e.g., 3"
+                  value={experience}
+                  onChange={(e) => setExperience(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-2" htmlFor="jobDescriptionOption">
+                  Job Description
+                </label>
+
+                <div className="flex space-x-4 mb-4">
+                  <label className="inline-flex items-center">
+                    <input
+                      type="radio"
+                      className="form-radio h-4 w-4 text-purple-600"
+                      name="jobDescriptionOption"
+                      value="paste"
+                      checked={jobDescriptionOption === 'paste'}
+                      onChange={() => setJobDescriptionOption('paste')}
+                      disabled={isLoading}
+                    />
+                    <span className="ml-2 text-sm">Paste Job Description</span>
+                  </label>
+
+                  <label className="inline-flex items-center">
+                    <input
+                      type="radio"
+                      className="form-radio h-4 w-4 text-purple-600"
+                      name="jobDescriptionOption"
+                      value="generate"
+                      checked={jobDescriptionOption === 'generate'}
+                      onChange={() => setJobDescriptionOption('generate')}
+                      disabled={isLoading}
+                    />
+                    <span className="ml-2 text-sm">Generate Job Description</span>
+                  </label>
+                </div>
+
+                {jobDescriptionOption === 'paste' ? (
+                  <textarea
+                    id="jobDescription"
+                    rows="5"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                    placeholder="Paste the job description here..."
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    disabled={isLoading}
+                  ></textarea>
+                ) : (
+                  <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex items-center">
+                    <Wand2 className="w-5 h-5 text-purple-400 mr-3" />
+                    <p className="text-sm text-gray-300">
+                      We'll generate a job description based on your target role and experience.
+                      <br />
+                      <span className="text-xs text-gray-400 mt-1 block">
+                        This will be used for generating interview questions.
+                      </span>
                     </p>
                   </div>
-                  <input
-                    id="resume"
-                    type="file"
-                    className="hidden"
-                    accept="application/pdf"
-                    onChange={handleFileChange}
-                    disabled={isLoading}
-                  />
-                </label>
-              </div>
-              {selectedFile && (
-                <div className="mt-2 flex items-center text-sm text-blue-300">
-                  <FileText className="w-4 h-4 mr-2" />
-                  {selectedFile.name}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-sm font-medium mb-2" htmlFor="currentRole">
-                  Current Role
-                </label>
-                <input
-                  id="currentRole"
-                  type="text"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
-                  placeholder="e.g., Software Engineer"
-                  value={currentRole}
-                  onChange={(e) => setCurrentRole(e.target.value)}
-                  disabled={isLoading}
-                />
+                )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2" htmlFor="targetRole">
-                  Target Role
-                </label>
-                <input
-                  id="targetRole"
-                  type="text"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
-                  placeholder="e.g., Senior Software Engineer"
-                  value={targetRole}
-                  onChange={(e) => setTargetRole(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" htmlFor="experience">
-                Years of Experience
-              </label>
-              <input
-                id="experience"
-                type="number"
-                min="0"
-                step="1"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
-                placeholder="e.g., 3"
-                value={experience}
-                onChange={(e) => setExperience(e.target.value)}
+              {error && <div className="mb-4 text-red-400 text-sm">{error}</div>}
+              <button
+                type="submit"
+                className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 ${isLoading ? 'bg-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'}`}
                 disabled={isLoading}
-              />
-            </div>
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Starting Practice...
+                  </span>
+                ) : 'Start Interview Practice'}
+              </button>
+            </form>
+            </>
+          )}
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" htmlFor="jobDescriptionOption">
-                Job Description
-              </label>
-
-              <div className="flex space-x-4 mb-4">
-                <label className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    className="form-radio h-4 w-4 text-purple-600"
-                    name="jobDescriptionOption"
-                    value="paste"
-                    checked={jobDescriptionOption === 'paste'}
-                    onChange={() => setJobDescriptionOption('paste')}
-                    disabled={isLoading}
-                  />
-                  <span className="ml-2 text-sm">Paste Job Description</span>
-                </label>
-
-                <label className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    className="form-radio h-4 w-4 text-purple-600"
-                    name="jobDescriptionOption"
-                    value="generate"
-                    checked={jobDescriptionOption === 'generate'}
-                    onChange={() => setJobDescriptionOption('generate')}
-                    disabled={isLoading}
-                  />
-                  <span className="ml-2 text-sm">Generate Job Description</span>
-                </label>
-              </div>
-
-              {jobDescriptionOption === 'paste' ? (
-                <textarea
-                  id="jobDescription"
-                  rows="5"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
-                  placeholder="Paste the job description here..."
-                  value={jobDescription}
-                  onChange={(e) => setJobDescription(e.target.value)}
-                  disabled={isLoading}
-                ></textarea>
-              ) : (
-                <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex items-center">
-                  <Wand2 className="w-5 h-5 text-purple-400 mr-3" />
-                  <p className="text-sm text-gray-300">
-                    We'll generate a job description based on your target role and experience.
-                    <br />
-                    <span className="text-xs text-gray-400 mt-1 block">
-                      This will be used for generating interview questions.
-                    </span>
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {error && <div className="mb-4 text-red-400 text-sm">{error}</div>}
-            <button
-              type="submit"
-              className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 ${isLoading ? 'bg-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'}`}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Starting Practice...
-                </span>
-              ) : 'Start Interview Practice'}
-            </button>
-          </form>
-
-          {result?.questions && (
+          {/* Exam Mode */}
+          {inExamMode && result?.questions && (
             <motion.div
               className="mt-8 p-6 bg-white/5 border border-white/20 rounded-xl"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <h3 className="text-lg font-semibold mb-4">{getRoundName(result.round)} Questions</h3>
-              <ul className="space-y-4 text-left list-decimal list-inside">
-                {Array.isArray(result.questions)
-                  ? result.questions.map((q, idx) => (
-                    <li key={idx} className="mb-2 whitespace-pre-line">
-                      {typeof q === 'string' ? q : JSON.stringify(q, null, 2)}
-                    </li>
-                  ))
-                  : (
-                    <>
-                      {result.questions.mcq_questions && (
-                        <>
-                          <h3 className="text-lg font-medium mb-2">MCQ Questions</h3>
-                          {result.questions.mcq_questions.map((item, idx) => (
-                            <li key={idx} className="mb-4">
-                              <p className="font-semibold">{item.question}</p>
-                              <div className="ml-4 space-y-1">
-                                {item.options.map((opt, i) => (
-                                  <label key={i} className="flex items-center">
-                                    <input
-                                      type="radio"
-                                      name={`mcq-${idx}`}
-                                      value={opt}
-                                      checked={answers.mcq[idx] === opt}
-                                      onChange={() =>
-                                        setAnswers((prev) => ({
-                                          ...prev,
-                                          mcq: { ...prev.mcq, [idx]: opt },
-                                        }))
-                                      }
-                                      className="mr-2"
-                                    />
-                                    {opt}
-                                  </label>
-                                ))}
-                              </div>
-                            </li>
-                          ))}
-                        </>
-                      )}
-                      {result.questions.desc_questions && (
-                        <>
-                          <h3 className="text-lg font-medium mb-2 mt-4">Descriptive Questions</h3>
-                          {result.questions.desc_questions.map((q, idx) => (
-                            <li key={idx} className="mb-4">
-                              <p className="font-semibold mb-2">{q}</p>
-                              <textarea
-                                className="w-full bg-gray-700 border border-gray-600 rounded-lg p-2"
-                                rows={3}
-                                value={answers.desc[idx] || ''}
-                                onChange={(e) =>
-                                  setAnswers((prev) => ({
-                                    ...prev,
-                                    desc: { ...prev.desc, [idx]: e.target.value },
-                                  }))
-                                }
-                              />
-                            </li>
-                          ))}
-                        </>
-                      )}
-                    </>
-                  )}
-              </ul>
-              <div className="flex flex-col space-y-4">
-                <button
-                  className="mt-6 py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 disabled:opacity-60 flex items-center justify-center"
-                  disabled={isLoading || !result?.sessionId || answersSubmitted || isValidating}
-                  onClick={async () => {
-                    try {
-                      // Log the data being sent
-                      console.log('Submitting answers:', {
-                        sessionId: result.sessionId,
-                        storedSessionId: sessionId,
-                        round: result.round,
-                        answers: answers
-                      });
-
-                      // Validate session ID consistency
-                      if (sessionId && result.sessionId !== sessionId) {
-                        console.warn('Session ID mismatch detected during submission:', {
-                          stored: sessionId,
-                          fromResult: result.sessionId
-                        });
-                      }
-
-                      // Check if answers have content
-                      const hasMcqAnswers = Object.keys(answers.mcq).length > 0;
-                      const hasDescAnswers = Object.keys(answers.desc).length > 0;
-
-                      if (!hasMcqAnswers && !hasDescAnswers) {
-                        toast.error('Please answer at least one question before submitting');
-                        return;
-                      }
-
-                      const token = localStorage.getItem('token');
-
-                      // Step 1: Submit answers
-                      const submitRes = await fetch(`${API_BASE_URL}/api/ai-interview/submit`, {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          Authorization: `Bearer ${token}`,
-                        },
-                        body: JSON.stringify({
-                          sessionId: result.sessionId,
-                          round: result.round,
-                          answers,
-                        }),
-                      });
-
-                      const submitResponseData = await submitRes.json();
-                      console.log('Submit response:', submitResponseData);
-
-                      if (!submitRes.ok) {
-                        throw new Error(submitResponseData.error || 'Failed to submit answers');
-                      }
-
-                      toast.success('Answers submitted successfully!');
-                      setAnswersSubmitted(true);
-
-                      // Step 2: Automatically start validation
-                      setIsValidating(true);
-                      toast.loading('Validating your answers...', { duration: 2000 });
-
-                      const validateRes = await fetch(`${API_BASE_URL}/api/ai-interview/validate`, {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          Authorization: `Bearer ${token}`,
-                        },
-                        body: JSON.stringify({
-                          sessionId: result.sessionId,
-                          round: result.round,
-                        }),
-                      });
-
-                      const validateResponseData = await validateRes.json();
-                      console.log('Validation response:', validateResponseData);
-
-                      if (!validateRes.ok) {
-                        throw new Error(validateResponseData.error || 'Failed to validate answers');
-                      }
-
-                      // Check if we have a validation response or an error
-                      if (!validateResponseData.validation) {
-                        if (validateResponseData.error) {
-                          // Handle specific error cases
-                          if (validateResponseData.error.includes('GROQ_API_KEY')) {
-                            throw new Error('AI validation service is currently unavailable. Please try again later.');
-                          } else {
-                            throw new Error(`Validation error: ${validateResponseData.error}`);
-                          }
-                        } else {
-                          throw new Error('Invalid validation response structure');
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">{getRoundName(result.round)} Questions</h3>
+                <div className="text-sm text-gray-300">
+                  Question {flatQuestions.length ? (currentQuestionIndex + 1) : 0} of {flatQuestions.length}
+                </div>
+              </div>
+              {flatQuestions.length > 0 && (
+                <div className="text-left">
+                  {flatQuestions[currentQuestionIndex].type === 'mcq' ? (
+                    <div>
+                      <p className="font-semibold mb-3">{flatQuestions[currentQuestionIndex].q.question}</p>
+                      <div className="space-y-2">
+                        {flatQuestions[currentQuestionIndex].q.options.map((opt, i) => (
+                          <label key={i} className="flex items-center p-2 rounded hover:bg-white/5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`mcq-${flatQuestions[currentQuestionIndex].idx}`}
+                              value={opt}
+                              checked={answers.mcq[flatQuestions[currentQuestionIndex].idx] === opt}
+                              onChange={() =>
+                                setAnswers((prev) => ({
+                                  ...prev,
+                                  mcq: { ...prev.mcq, [flatQuestions[currentQuestionIndex].idx]: opt },
+                                }))
+                              }
+                              className="mr-2"
+                            />
+                            {opt}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="font-semibold mb-3">{flatQuestions[currentQuestionIndex].q}</p>
+                      <textarea
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3"
+                        rows={5}
+                        value={answers.desc[flatQuestions[currentQuestionIndex].idx] || ''}
+                        onChange={(e) =>
+                          setAnswers((prev) => ({
+                            ...prev,
+                            desc: { ...prev.desc, [flatQuestions[currentQuestionIndex].idx]: e.target.value },
+                          }))
                         }
-                      }
-
-                      // Ensure validation has the expected structure with fallbacks for missing data
-                      const validationData = {
-                        verdict: validateResponseData.validation?.verdict || 'No Verdict',
-                        total_score: validateResponseData.validation?.total_score ?? 0,
-                        max_possible_score: validateResponseData.validation?.max_possible_score ?? 0,
-                        percentage: validateResponseData.validation?.percentage ?? 0,
-                        mcq: validateResponseData.validation?.mcq ?? { score: 0, max_score: 0, details: [] },
-                        descriptive: validateResponseData.validation?.descriptive ?? { score: 0, max_score: 0, details: [] }
-                      };
-
-                      setValidation(validationData);
-                      toast.success(`Validation complete! Verdict: ${validationData.verdict}`);
-
-                    } catch (err) {
-                      console.error('Submit/Validation error:', err);
-                      toast.error(err.message || 'Submit/Validation failed');
-                    } finally {
-                      setIsValidating(false);
-                    }
-                  }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Navigation Controls */}
+              <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <button
+                  className="py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-gray-700 hover:bg-gray-600 disabled:opacity-60"
+                  onClick={() => setCurrentQuestionIndex((i) => Math.max(0, i - 1))}
+                  disabled={currentQuestionIndex === 0}
                 >
-                  {isValidating ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Validating...
-                    </>
-                  ) : answersSubmitted ? 'Completed' : 'Submit & Validate Answers'}
+                  Previous
                 </button>
+                {currentQuestionIndex < flatQuestions.length - 1 ? (
+                  <button
+                    className="py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 disabled:opacity-60"
+                    onClick={() => setCurrentQuestionIndex((i) => Math.min(flatQuestions.length - 1, i + 1))}
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button
+                    className="py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:opacity-60 flex items-center justify-center"
+                    disabled={isLoading || !result?.sessionId || answersSubmitted || isValidating}
+                    onClick={submitAndValidate}
+                  >
+                    {isValidating ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Validating...
+                      </>
+                    ) : answersSubmitted ? 'Completed' : 'Submit Exam'}
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
@@ -831,7 +915,7 @@ export default function AIInterview() {
                       <>
                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         Starting Next Round...
                       </>
@@ -851,7 +935,7 @@ export default function AIInterview() {
                   <div className="py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg text-center">
                     <div className="flex items-center justify-center mb-2">
                       <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <h4 className="text-lg font-bold">Interview Process Complete!</h4>
                     </div>
@@ -874,6 +958,7 @@ export default function AIInterview() {
                       setAnswersSubmitted(false);
                       setResult(null);
                       setShowFullReport(false);
+                      setInExamMode(false);
                       toast.success('Ready to start a new interview!');
                     }}
                     disabled={isLoading}
