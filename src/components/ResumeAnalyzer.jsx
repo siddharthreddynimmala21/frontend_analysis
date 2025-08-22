@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
 import { motion } from 'framer-motion';
 import { FileText, Upload, Briefcase, Wand2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -337,16 +340,29 @@ export default function ResumeAnalyzer() {
           
           {result && (
             <motion.div 
-              className="mt-8 p-6 bg-white/5 border border-white/20 rounded-xl"
+              className="mt-8 p-6 bg-white/5 border border-white/20 rounded-xl text-white"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
               <h3 className="text-lg font-semibold mb-4">Analysis Results</h3>
-              {/* Render markdown as plain text without heading markers */}
-              <pre className="whitespace-pre-wrap text-sm text-white">
-                {result.message.replace(/^#+\s+/gm, '')}
-              </pre>
+              {/* Render markdown properly; inherit dark theme colors */}
+              <div className="max-w-none">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    ul: ({node, ...props}) => <ul style={{listStyleType:'disc', listStylePosition:'outside', paddingLeft:20, marginBottom:8}} {...props} />,
+                    ol: ({node, ...props}) => <ol style={{listStyleType:'decimal', listStylePosition:'outside', paddingLeft:20, marginBottom:8}} {...props} />,
+                    h1: ({node, ...props}) => <h1 style={{fontSize:22, fontWeight:700, marginTop:14, marginBottom:10}} {...props} />,
+                    h2: ({node, ...props}) => <h2 style={{fontSize:18, fontWeight:700, marginTop:12, marginBottom:8}} {...props} />,
+                    h3: ({node, ...props}) => <h3 style={{fontSize:16, fontWeight:700, marginTop:10, marginBottom:6}} {...props} />,
+                    p: ({node, ...props}) => <p style={{fontSize:14, lineHeight:1.7, marginBottom:8}} {...props} />,
+                    li: ({node, ...props}) => <li style={{fontSize:14, lineHeight:1.7, marginBottom:6}} {...props} />
+                  }}
+                >
+                  {result.message}
+                </ReactMarkdown>
+              </div>
             </motion.div>
           )}
         </motion.div>

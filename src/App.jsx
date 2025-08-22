@@ -13,6 +13,7 @@ import ArrayMean from './components/ArrayMean';
 import ResumeAnalyzer from './components/ResumeAnalyzer';
 import ForgotPassword from './components/auth/ForgotPassword';
 import AIInterview from './components/AIInterview';
+import Landing from './components/Landing';
 
 function App() {
   return (
@@ -80,7 +81,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Landing />} />
         </Routes>
       </AuthProvider>
     </Router>

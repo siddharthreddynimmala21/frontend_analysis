@@ -1,0 +1,58 @@
+/* Reset-ish */
+.landing-root { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Helvetica Neue", sans-serif; color: #111827; background:#ffffff; }
+.landing-container { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+/* Nav */
+.landing-nav { position: sticky; top:0; background:#fff; border-bottom: 1px solid #eee; z-index: 20; }
+.nav-inner { display:flex; align-items:center; justify-content:space-between; height:64px; }
+.brand { display:flex; align-items:center; gap:10px; font-weight:600; }
+.brand-icon { font-size:18px; }
+.brand-text { font-size:16px; }
+.nav-links { display:flex; align-items:center; gap:16px; }
+.nav-link { color:#111827; text-decoration:none; font-size:14px; padding:8px 10px; border-radius:8px; }
+.nav-link:hover { background:#f5f5f5; }
+
+/* Buttons */
+.btn { display:inline-flex; align-items:center; gap:8px; padding:12px 16px; border-radius:12px; font-weight:600; font-size:14px; text-decoration:none; }
+.btn.sm { padding:8px 12px; border-radius:10px; }
+.btn-dark { background:#111827; color:#fff; box-shadow: 0 1px 0 rgba(0,0,0,.5); }
+.btn-light { background:#e5e7eb; color:#111827; }
+.btn:active { transform: translateY(1px); }
+.icon { display:inline-flex; width:18px; height:18px; align-items:center; justify-content:center; border-radius:999px; background:#111827; color:#fff; font-size:10px; }
+
+/* Hero */
+.landing-hero { padding: 72px 0 40px; }
+.hero-inner { text-align:center; }
+.hero-title { font-weight:800; font-size:48px; line-height:1.05; letter-spacing:-0.02em; margin: 16px auto 14px; max-width: 780px; }
+.hero-sub { color:#6b7280; font-size:16px; max-width: 720px; margin: 0 auto 22px; }
+.hero-actions { display:flex; gap:12px; align-items:center; justify-content:center; }
+
+/* Features */
+.landing-features { padding: 56px 0 72px; }
+.section-title { text-align:center; font-weight:700; font-size:28px; margin-bottom:8px; }
+.section-sub { text-align:center; color:#9ca3af; margin:0 auto 26px; max-width:640px; }
+.feature-list { display:flex; flex-direction:column; gap:16px; margin-top:10px; }
+.feature-card { display:flex; gap:16px; align-items:center; border:1px solid #eee; border-radius:14px; padding:18px 18px; box-shadow: 0 6px 24px rgba(0,0,0,0.04); }
+.feature-icon { width:44px; height:44px; border-radius:10px; background:#f3f4f6; display:flex; align-items:center; justify-content:center; font-size:18px; }
+.feature-title { font-weight:600; }
+.feature-desc { color:#6b7280; font-size:14px; }
+
+/* How */
+.landing-how { background:#e5e5e5; padding: 48px 0 56px; }
+.how-list { display:flex; flex-direction:column; gap:18px; margin-top:10px; }
+.how-card { display:flex; align-items:center; gap:16px; background:#ffffff; border-radius:14px; padding:18px; box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
+.how-num { width:28px; height:28px; background:#111827; color:#fff; border-radius:999px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; }
+.how-thumb { width:56px; height:40px; border-radius:8px; background:#e5e7eb; }
+.how-title { font-weight:600; }
+.how-desc { color:#6b7280; font-size:14px; }
+
+/* Footer */
+.landing-footer { background:#f9fafb; border-top:1px solid #eee; padding: 18px 0; }
+.footer-inner { display:flex; gap:24px; align-items:center; justify-content:center; }
+.footer-inner a { color:#6b7280; text-decoration:none; font-size:14px; }
+.footer-inner a:hover { text-decoration:underline; }
+
+/* Responsive tweaks */
+@media (max-width: 640px) {
+  .hero-title { font-size:36px; }
+}

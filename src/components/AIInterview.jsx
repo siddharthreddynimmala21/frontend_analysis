@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, Upload, Wand2, Brain } from 'lucide-react';
 import Navigation from './common/Navigation';
@@ -32,12 +32,302 @@ export default function AIInterview() {
   // Two-step flow: setup view -> exam view
   const [inExamMode, setInExamMode] = useState(false);
 
+  // Per-question countdown timer
+  const [timeLeft, setTimeLeft] = useState(null); // seconds
+  const timerRef = useRef(null);
+  const [disabledQuestions, setDisabledQuestions] = useState(new Set()); // set of flat index numbers that are expired/locked
+  const autoAdvanceRef = useRef(false);
+  const [questionTimers, setQuestionTimers] = useState({}); // key: flat index -> seconds remaining
+
   // Session ID Management:
   // - Round 1: Generate new session ID (backend creates new interview)
   // - Rounds 2-4: Reuse existing session ID (backend adds rounds to existing interview)
   // - New Interview: Reset session ID to null (forces new session creation)
 
   // Debug session ID changes
+
+  // Format seconds to MM:SS
+  const formatTime = (secs) => {
+    if (secs == null || Number.isNaN(secs)) return '--:--';
+    const m = Math.floor(secs / 60)
+      .toString()
+      .padStart(2, '0');
+    const s = Math.floor(secs % 60)
+      .toString()
+      .padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  // Build a full styled HTML for the report (inline CSS for fidelity)
+  const buildReportHTML = (validationData, meta = {}) => {
+    const { sessionId: sid = sessionId, round: rnd = currentRound } = meta || {};
+    const v = validationData || {};
+    const safe = (x) => (x == null ? '' : String(x));
+    const mcqRows = (v.mcq?.details || []).map((d, i) => {
+      if (d && typeof d === 'object') {
+        const letterToIdx = (letter) => {
+          if (!letter || typeof letter !== 'string') return -1;
+          const L = letter.trim().toUpperCase();
+          return L.charCodeAt(0) - 65; // A->0, B->1
+        };
+        const opts = Array.isArray(d.options) ? d.options : [];
+        const ua = safe(d.user_answer);
+        const ca = safe(d.correct_answer);
+        const uaIdx = letterToIdx(ua);
+        const caIdx = letterToIdx(ca);
+        const uaText = uaIdx >= 0 && uaIdx < opts.length ? opts[uaIdx] : '';
+        const caText = caIdx >= 0 && caIdx < opts.length ? opts[caIdx] : '';
+        const isCorrect = Boolean(d.is_correct);
+        const qText = safe(d.question);
+        const optionList = opts.map((t, k) => `<div class="opt"><span class="key">${String.fromCharCode(65 + k)}.</span> ${safe(t)}</div>`).join('');
+        return `
+          <tr>
+            <td>Q${i + 1}</td>
+            <td>
+              <div class="q"><strong>Question:</strong> ${qText}</div>
+              <div class="options">${optionList}</div>
+              <div class="answers">
+                <span class="pill ${isCorrect ? 'pass' : 'fail'}" style="margin-right:8px;">${isCorrect ? 'Correct' : 'Incorrect'}</span>
+                <div><strong>Your answer:</strong> ${ua ? ua + ' — ' : ''}${safe(uaText)}</div>
+                <div><strong>Correct answer:</strong> ${ca ? ca + ' — ' : ''}${safe(caText)}</div>
+              </div>
+            </td>
+          </tr>`;
+      }
+      return `
+        <tr>
+          <td>Q${i + 1}</td>
+          <td>${safe(d)}</td>
+        </tr>`;
+    }).join('');
+
+    const descRows = (v.descriptive?.details || []).map((d, i) => {
+      if (d && typeof d === 'object') {
+        const qText = safe(d.question || d.prompt || '');
+        const userAns = safe(d.user_answer || d.answer || '');
+        const expected = safe(d.expected_answer || d.model_answer || '');
+        const feedback = safe(d.feedback || d.explanation || '');
+        const score = (d.score != null ? `Score: ${safe(d.score)}${d.max_score != null ? ' / ' + safe(d.max_score) : ''}` : '');
+        const verdict = d.is_correct != null ? (d.is_correct ? 'Correct' : 'Needs Improvement') : '';
+        return `
+          <tr>
+            <td>Q${i + 1}</td>
+            <td>
+              <div class="q"><strong>Question:</strong> ${qText}</div>
+              ${score ? `<div class="muted" style="margin:6px 0;">${score}${verdict ? ' • ' + verdict : ''}</div>` : ''}
+              <div style="margin-top:6px;"><strong>Your answer:</strong><div class="code">${userAns || '<span class=\"muted\">N/A</span>'}</div></div>
+              ${expected ? `<div style="margin-top:8px;"><strong>Expected/Model answer:</strong><div class="code">${expected}</div></div>` : ''}
+              ${feedback ? `<div style="margin-top:8px;"><strong>Feedback:</strong><div>${feedback}</div></div>` : ''}
+            </td>
+          </tr>`;
+      }
+      return `
+        <tr>
+          <td>Q${i + 1}</td>
+          <td>${safe(d)}</td>
+        </tr>`;
+    }).join('');
+
+    return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Interview Report</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root { --primary:#2563eb; --bg:#f8fafc; --muted:#64748b; --border:#e2e8f0; }
+      html, body { margin:0; padding:0; font-family: Inter, Arial, sans-serif; color:#0f172a; background:#ffffff; }
+      .header { background: var(--bg); border-bottom:1px solid var(--border); padding:20px 28px; }
+      .header h1 { margin:0; font-size:22px; color:var(--primary); }
+      .meta { font-size:12px; color: var(--muted); margin-top:4px; }
+      .container { padding:28px; }
+      .grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:16px; }
+      .card { border:1px solid var(--border); border-radius:10px; padding:16px; }
+      .label { color: var(--muted); font-size:12px; }
+      .value { font-weight:700; font-size:18px; margin-top:4px; }
+      .section { margin-top:24px; }
+      .section h2 { font-size:16px; margin:0 0 8px 0; }
+      table { width:100%; border-collapse: collapse; }
+      th, td { text-align:left; border-bottom:1px solid var(--border); padding:8px 6px; font-size:13px; vertical-align: top; }
+      .muted { color: var(--muted); }
+      .pill { display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+      .pill.pass { background:#dcfce7; color:#166534; }
+      .pill.fail { background:#fee2e2; color:#991b1b; }
+      .q { margin-bottom:6px; }
+      .options { display:grid; grid-template-columns: 1fr 1fr; gap:4px 12px; margin:6px 0 8px; }
+      .opt .key { display:inline-block; width:18px; font-weight:600; color:#334155; }
+      .answers { margin-top:4px; }
+      .code { background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:8px; white-space:pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>AI Interview Report</h1>
+      <div class="meta">Session: ${safe(sid)} • Round: ${safe(rnd)} • Verdict: <span class="pill ${v.verdict === 'Pass' ? 'pass' : 'fail'}">${safe(v.verdict)}</span></div>
+    </div>
+    <div class="container">
+      <div class="grid">
+        <div class="card"><div class="label">Total Score</div><div class="value">${safe(v.total_score)} / ${safe(v.max_possible_score)}</div></div>
+        <div class="card"><div class="label">Percentage</div><div class="value">${safe(v.percentage)}%</div></div>
+      </div>
+
+      <div class="section">
+        <h2>MCQ Section</h2>
+        <div class="muted">Score: ${safe(v.mcq?.score)} / ${safe(v.mcq?.max_score)}</div>
+        <div style="margin-top:10px;"/>
+        <table>
+          <thead><tr><th style="width:64px;">Item</th><th>Detail</th></tr></thead>
+          <tbody>
+            ${mcqRows || '<tr><td colspan="2" class="muted">No details</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <h2>Descriptive Section</h2>
+        <div class="muted">Score: ${safe(v.descriptive?.score)} / ${safe(v.descriptive?.max_score)}</div>
+        <div style="margin-top:10px;"/>
+        <table>
+          <thead><tr><th style="width:64px;">Item</th><th>Detail</th></tr></thead>
+          <tbody>
+            ${descRows || '<tr><td colspan="2" class="muted">No details</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>`;
+  };
+
+  // Send the report HTML to backend for PDF generation + email
+  const emailPdfReport = async (html, opts = {}) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/report/download`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          html,
+          subject: opts.subject || 'Your AI Interview Report (PDF)',
+          fileName: opts.fileName || 'interview_report.pdf',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to email PDF report');
+      toast.success('Report emailed to your registered address');
+    } catch (err) {
+      console.error('Email PDF report error:', err);
+      toast.error(err.message || 'Failed to email report');
+    }
+  };
+
+  // Reset disabled state and timer when a new exam starts (result.questions changes and we enter exam mode)
+  useEffect(() => {
+    if (inExamMode && flatQuestions.length > 0) {
+      setDisabledQuestions(new Set());
+      // Initialize timer for the current question
+      autoAdvanceRef.current = false;
+      const q = flatQuestions[currentQuestionIndex];
+      const defaultDuration = q?.type === 'mcq' ? 30 : 300;
+      const init = disabledQuestions.has(currentQuestionIndex) ? 0 : defaultDuration;
+      // Only initialize the current question if it has no stored time; do not overwrite existing timers
+      setQuestionTimers((prev) => (
+        prev && Object.prototype.hasOwnProperty.call(prev, currentQuestionIndex)
+          ? prev
+          : { ...(prev || {}), [currentQuestionIndex]: init }
+      ));
+      setTimeLeft((prev) => (prev == null ? init : prev));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inExamMode, result?.questions]);
+
+  // Start/restart timer when question index changes
+  useEffect(() => {
+    if (!inExamMode || flatQuestions.length === 0) return;
+    if (answersSubmitted || isValidating || Boolean(validation)) {
+      // Do not start or continue timers after submission/validation
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setTimeLeft(0);
+      return;
+    }
+
+    // Clear any prior timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    autoAdvanceRef.current = false;
+    const q = flatQuestions[currentQuestionIndex];
+    if (!q) return;
+    const duration = q.type === 'mcq' ? 30 : 300;
+    const startFrom = duration; // Always start fresh per requirement
+    setTimeLeft(startFrom);
+
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev == null) return prev;
+        const next = prev - 1;
+        if (next <= 0) {
+          // lock this question and auto-advance/submit
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+          if (!disabledQuestions.has(currentQuestionIndex)) {
+            setDisabledQuestions((old) => {
+              const n = new Set(old);
+              n.add(currentQuestionIndex);
+              return n;
+            });
+          }
+          if (!autoAdvanceRef.current) {
+            autoAdvanceRef.current = true;
+            const isLast = currentQuestionIndex >= flatQuestions.length - 1;
+            if (isLast) {
+              // auto-submit if not already submitted/validating
+              if (!isValidating && !answersSubmitted) {
+                // brief timeout to allow state updates to flush
+                setTimeout(() => {
+                  try { submitAndValidate(); } catch (e) { /* no-op */ }
+                }, 50);
+              }
+            } else {
+              // go to next question
+              setTimeout(() => {
+                // save current (0) already saved; navigate
+                navigateToIndex(Math.min(flatQuestions.length - 1, currentQuestionIndex + 1));
+              }, 10);
+            }
+          }
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuestionIndex, inExamMode, flatQuestions.length]);
+
+  // Helper to navigate while persisting current question's timer
+  const navigateToIndex = (nextIndex) => {
+    // Enforce forward-only navigation
+    if (nextIndex <= currentQuestionIndex) return;
+    setCurrentQuestionIndex(nextIndex);
+  };
   useEffect(() => {
     console.log('Session ID updated:', sessionId);
   }, [sessionId]);
@@ -46,6 +336,24 @@ export default function AIInterview() {
   useEffect(() => {
     console.log('Current round updated:', currentRound);
   }, [currentRound]);
+
+  // After submission/validation, stop timer and prevent further edits
+  useEffect(() => {
+    if (answersSubmitted || isValidating || Boolean(validation)) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      // Freeze timer display and lock current question
+      setTimeLeft(0);
+      setDisabledQuestions((old) => {
+        const n = new Set(old);
+        n.add(currentQuestionIndex);
+        return n;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answersSubmitted, isValidating, validation]);
 
   // Build a flat questions array for single-question navigation when results change
   useEffect(() => {
@@ -189,6 +497,7 @@ export default function AIInterview() {
         body: JSON.stringify({
           sessionId: sessionToUse,
           round: roundToUse,
+          sendEmail: false,
           ...(roundIdToUse ? { roundId: roundIdToUse } : {}),
         }),
       });
@@ -212,6 +521,10 @@ export default function AIInterview() {
 
       setValidation(validationData);
       toast.success(`Validation complete! Verdict: ${validationData.verdict}`);
+
+      // Generate styled HTML and trigger server-side PDF email
+      const html = buildReportHTML(validationData, { sessionId: sessionToUse, round: roundToUse });
+      emailPdfReport(html, { subject: 'Your AI Interview Report (PDF)', fileName: `interview_${sessionToUse || 'report'}.pdf` });
     } catch (err) {
       console.error('Submit/Validation error:', err);
       toast.error(err.message || 'Submit/Validation failed');
@@ -726,8 +1039,16 @@ export default function AIInterview() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">{getRoundName(result.round)} Questions</h3>
-                <div className="text-sm text-gray-300">
-                  Question {flatQuestions.length ? (currentQuestionIndex + 1) : 0} of {flatQuestions.length}
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-gray-300">
+                    Question {flatQuestions.length ? (currentQuestionIndex + 1) : 0} of {flatQuestions.length}
+                  </div>
+                  <div
+                    className={`px-3 py-1 rounded-md text-sm font-mono ${(timeLeft !== null && timeLeft <= 10 && timeLeft > 0) ? 'bg-red-600/30 text-red-200' : 'bg-indigo-600/30 text-indigo-100'}`}
+                    title="Time remaining for this question"
+                  >
+                    {formatTime(timeLeft)}
+                  </div>
                 </div>
               </div>
               {flatQuestions.length > 0 && (
@@ -750,6 +1071,7 @@ export default function AIInterview() {
                                 }))
                               }
                               className="mr-2"
+                              disabled={timeLeft === 0 || answersSubmitted || isValidating || Boolean(validation)}
                             />
                             {opt}
                           </label>
@@ -769,31 +1091,43 @@ export default function AIInterview() {
                             desc: { ...prev.desc, [flatQuestions[currentQuestionIndex].idx]: e.target.value },
                           }))
                         }
+                        disabled={timeLeft === 0 || answersSubmitted || isValidating || Boolean(validation)}
                       />
                     </div>
                   )}
                 </div>
               )}
-              {/* Navigation Controls */}
-              <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                <button
-                  className="py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-gray-700 hover:bg-gray-600 disabled:opacity-60"
-                  onClick={() => setCurrentQuestionIndex((i) => Math.max(0, i - 1))}
-                  disabled={currentQuestionIndex === 0}
-                >
-                  Previous
-                </button>
+              {/* Navigation Controls - forward only */}
+              <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
                 {currentQuestionIndex < flatQuestions.length - 1 ? (
                   <button
                     className="py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 disabled:opacity-60"
-                    onClick={() => setCurrentQuestionIndex((i) => Math.min(flatQuestions.length - 1, i + 1))}
+                    onClick={() => navigateToIndex(Math.min(flatQuestions.length - 1, currentQuestionIndex + 1))}
+                    disabled={(() => {
+                      const cq = flatQuestions[currentQuestionIndex];
+                      if (!cq) return true;
+                      const idx = cq.idx;
+                      const hasAnswer = cq.type === 'mcq'
+                        ? Boolean(answers.mcq[idx])
+                        : Boolean((answers.desc[idx] || '').trim());
+                      return !hasAnswer || timeLeft === 0 || answersSubmitted || isValidating || Boolean(validation);
+                    })()}
                   >
                     Next
                   </button>
                 ) : (
                   <button
                     className="py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:opacity-60 flex items-center justify-center"
-                    disabled={isLoading || !result?.sessionId || answersSubmitted || isValidating}
+                    disabled={(() => {
+                      if (isLoading || !result?.sessionId || answersSubmitted || isValidating) return true;
+                      const cq = flatQuestions[currentQuestionIndex];
+                      if (!cq) return true;
+                      const idx = cq.idx;
+                      const hasAnswer = cq.type === 'mcq'
+                        ? Boolean(answers.mcq[idx])
+                        : Boolean((answers.desc[idx] || '').trim());
+                      return !hasAnswer || timeLeft === 0 || answersSubmitted || isValidating || Boolean(validation);
+                    })()}
                     onClick={submitAndValidate}
                   >
                     {isValidating ? (
