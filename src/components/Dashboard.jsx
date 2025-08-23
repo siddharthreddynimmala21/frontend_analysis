@@ -1,104 +1,177 @@
-import { motion } from 'framer-motion';
-import { MessageSquare, FileText, Briefcase, Calculator, FileSearch } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navigation from './common/Navigation';
-import React from 'react';
-
-
-
-
+import { Shield, MessageSquare, FileText, Wand2, Upload } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import ConfirmationDialog from './common/ConfirmationDialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [displayName, setDisplayName] = useState('');
+  const [showProfileInfo, setShowProfileInfo] = useState(false);
 
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); setShowLogoutConfirm(false); };
+  const cancelLogout = () => setShowLogoutConfirm(false);
 
+  // Derive a readable name from stored email, fallback to JWT token
+  useEffect(() => {
+    try {
+      // 1) Prefer stored email from login response
+      let email = localStorage.getItem('email');
 
-
-  const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.4,
-        ease: "easeOut"
+      // 2) Fallback: attempt to parse JWT for email (if present)
+      if (!email) {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const payloadPart = token.split('.')[1];
+          if (payloadPart) {
+            // Handle URL-safe base64 variants and padding
+            const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+            const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+            const decoded = JSON.parse(atob(padded));
+            email = decoded?.email || decoded?.user?.email || '';
+          }
+        }
       }
+
+      if (!email) return;
+      const local = email.split('@')[0];
+      const parts = local
+        .replace(/\d+/g, ' ') // remove digits
+        .split(/[._-]+|\s+/)
+        .filter(Boolean);
+      const name = parts
+        .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(' ')
+        .trim();
+      setDisplayName(name || 'User');
+    } catch (e) {
+      // Fallback
+      setDisplayName('User');
     }
-  };
+  }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white p-2 sm:p-4 lg:p-8">
-      <Navigation showBack={false} />
-      
-      <div className="flex-1 flex flex-col items-center justify-center w-full -mt-8 sm:mt-6">
-        <motion.div
-          className="w-full max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 mt-16 sm:mt-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-6 sm:mb-12">Welcome to ResumeRefiner Pro+</h1>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto justify-center items-center">
-            {/* AI Chat Card */}
-            <motion.div
-              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/20 transition-all duration-100 cursor-pointer"
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/chat')}
+    <div className="min-h-screen bg-white text-gray-900">
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className="w-60 border-r border-gray-200 min-h-screen p-4">
+          <div className="flex items-center gap-2 px-2 mb-6">
+            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+              <Shield className="w-4 h-4 text-gray-700" />
+            </div>
+            <div className="text-xl font-semibold">Resume Refiner</div>
+          </div>
+          <nav className="space-y-1">
+            <button
+              className="w-full text-left px-3 py-2 rounded-md bg-gray-100 text-gray-900 font-medium"
+              onClick={() => navigate('/dashboard')}
             >
-              <div className="p-4 sm:p-6 lg:p-8">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
-                  <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold mb-2">AI Chat</h2>
-                <p className="text-sm sm:text-base text-gray-300">Chat with our AI assistant about your resume, career advice, or job search questions.</p>
-              </div>
-            </motion.div>
+              Dashboard
+            </button>
+            <button
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+              onClick={() => setShowProfileInfo(true)}
+            >
+              My Profile
+            </button>
+            <button
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
+          </nav>
+        </aside>
 
-            {/* Resume Analyzer Card */}
-            <motion.div
-              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/20 transition-all duration-100 cursor-pointer"
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
+        {/* Main content */}
+        <main className="flex-1 p-6">
+          {/* Top bar */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="text-sm text-gray-500">Welcome back,</div>
+              <div className="text-xl font-semibold text-gray-900">{displayName ? `${displayName}!` : 'User!'}</div>
+            </div>
+            {/* <button
+              className="inline-flex items-center gap-2 px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md border border-gray-300"
               onClick={() => navigate('/resume-analyzer')}
             >
-              <div className="p-4 sm:p-6 lg:p-8">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
-                  <FileSearch className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold mb-2">Resume Analyzer</h2>
-                <p className="text-sm sm:text-base text-gray-300">Analyze your resume against job descriptions and get AI-powered suggestions.</p>
-              </div>
-            </motion.div>
-
-            {/* AI Interview Practice Card */}
-            <motion.div
-              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/20 transition-all duration-100 cursor-pointer"
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/ai-interview')}
-            >
-              <div className="p-4 sm:p-6 lg:p-8">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
-                  <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold mb-2">AI Interview</h2>
-                <p className="text-sm sm:text-base text-gray-300">Practice interview skills with AI and receive instant, personalized feedback to help you improve.</p>
-              </div>
-            </motion.div>
+              <Upload className="w-4 h-4" />
+              Upload Resume
+            </button> */}
           </div>
-        </motion.div>
+
+          {/* Action blocks */}
+          <div className="space-y-5 max-w-3xl">
+            {/* Start Interview */}
+            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5">
+              <MessageSquare className="w-5 h-5 text-gray-700 mb-3" />
+              <div className="text-gray-700 mb-3">Start a practice interview session.</div>
+              <button
+                className="px-4 py-2 bg-black text-white rounded-md text-sm"
+                onClick={() => navigate('/ai-interview')}
+              >
+                Start Now
+              </button>
+            </div>
+
+            {/* Open Chat */}
+            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5">
+              <FileText className="w-5 h-5 text-gray-700 mb-3" />
+              <div className="text-gray-700 mb-3">Ask questions about your resume.</div>
+              <button
+                className="px-4 py-2 bg-black text-white rounded-md text-sm"
+                onClick={() => navigate('/chat')}
+              >
+                Open Chat
+              </button>
+            </div>
+
+            {/* Get Feedback */}
+            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5">
+              <Wand2 className="w-5 h-5 text-gray-700 mb-3" />
+              <div className="text-gray-700 mb-3">Get feedback to improve your resume.</div>
+              <button
+                className="px-4 py-2 bg-black text-white rounded-md text-sm"
+                onClick={() => navigate('/resume-analyzer')}
+              >
+                Get Feedback
+              </button>
+            </div>
+          </div>
+        </main>
       </div>
+
+      {showLogoutConfirm && (
+        <ConfirmationDialog
+          message={
+            <div className="text-center">
+              <div className="text-xl font-semibold text-gray-800 mb-2">See you soon!</div>
+              <div className="text-sm text-gray-600">Are you sure you want to logout?</div>
+            </div>
+          }
+          onConfirm={confirmLogout}
+          onCancel={cancelLogout}
+          confirmText="Yes, logout"
+          cancelText="Cancel"
+        />
+      )}
+
+      {showProfileInfo && (
+        <ConfirmationDialog
+          message={
+            <div className="text-center">
+              <div className="text-base text-gray-700">Profile feature is coming soon.</div>
+            </div>
+          }
+          onConfirm={() => setShowProfileInfo(false)}
+          onCancel={() => setShowProfileInfo(false)}
+          confirmText="OK"
+          cancelText="Close"
+        />
+      )}
     </div>
   );
 }

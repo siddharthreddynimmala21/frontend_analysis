@@ -5,8 +5,7 @@ import toast from 'react-hot-toast';
 import { login } from '../../services/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { motion } from 'framer-motion';
-import { LogIn, AlertTriangle, Eye, EyeOff } from 'lucide-react';
+import { LogIn, AlertTriangle, Eye, EyeOff, Shield } from 'lucide-react';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -29,6 +28,10 @@ export default function Login() {
       try {
         setLoading(true);
         const response = await login(values.email, values.password);
+        // Persist token and email for later use
+        if (response?.user?.email) {
+          localStorage.setItem('email', response.user.email);
+        }
         authLogin(response.token);
         toast.success('Login successful!');
         navigate('/dashboard');
@@ -54,42 +57,46 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white px-4 py-12">
-      <div className="w-full max-w-md shadow-2xl border border-white/30 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl">
-        <div className="text-center space-y-4 p-8 sm:p-10">
-          <div className="mx-auto w-16 h-16 flex items-center justify-center">
-            <img src="/assets/Resume_Refiner.png" alt="ResumeRefiner Logo" className="w-full h-full object-contain rounded-lg" />
+    <div className="min-h-screen flex items-center justify-center bg-white text-gray-900 px-4 py-12">
+      <div className="w-full max-w-sm bg-white rounded-xl shadow-xl border border-gray-200">
+        {/* Header with icon and tabs */}
+        <div className="p-6">
+          <div className="flex justify-center mb-4">
+            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+              <Shield className="w-4 h-4 text-gray-700" />
+            </div>
           </div>
-          <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            ResumeRefiner Pro+
-          </div>
-          <div className="text-gray-600 dark:text-gray-300">
-            AI-Powered Resume Analysis & Enhancement
+          <div className="flex bg-gray-200 rounded-lg p-1">
+            <button type="button" className="flex-1 py-2 rounded-md bg-white border border-gray-200 text-gray-900 font-medium">Login</button>
+            <Link to="/register" className="flex-1 py-2 rounded-md text-center text-gray-500 hover:text-gray-700">Sign Up</Link>
           </div>
         </div>
-        <div className="px-8 pb-8">
+
+        {/* Form */}
+        <div className="px-6 pb-6">
           <form className="space-y-4" onSubmit={formik.handleSubmit} autoComplete="on">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-gray-700 dark:text-gray-200">Mail ID</label>
+              <label htmlFor="email" className="text-sm text-gray-700">Email</label>
               <input
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
                 required
-                className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-purple-500 transition-all duration-200 appearance-none rounded-lg block w-full px-4 py-2 border text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none sm:text-base"
-                placeholder="Enter your ID"
+                className="bg-white border border-gray-300 focus:ring-2 focus:ring-gray-300 transition-all duration-200 appearance-none rounded-md block w-full px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none sm:text-sm"
+                placeholder="name@email.com"
                 {...formik.getFieldProps('email')}
               />
               {formik.touched.email && formik.errors.email && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 flex items-center space-x-2 mt-1">
+                <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 flex items-center space-x-2 mt-1">
                   <AlertTriangle className="w-4 h-4 text-red-500" />
-                  <span className="text-red-800 dark:text-red-200 text-sm">{formik.errors.email}</span>
+                  <span className="text-red-700 text-xs">{formik.errors.email}</span>
                 </div>
               )}
             </div>
+
             <div className="space-y-2">
-              <label htmlFor="password" className="text-gray-700 dark:text-gray-200">Password</label>
+              <label htmlFor="password" className="text-sm text-gray-700">Password</label>
               <div className="relative">
                 <input
                   id="password"
@@ -97,64 +104,48 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className="bg-white/70 dark:bg-gray-700/70 border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-purple-500 transition-all duration-200 appearance-none rounded-lg block w-full pr-10 px-4 py-2 border text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none sm:text-base"
-                  placeholder="Enter your password"
+                  className="bg-white border border-gray-300 focus:ring-2 focus:ring-gray-300 transition-all duration-200 appearance-none rounded-md block w-full pr-10 px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none sm:text-sm"
+                  placeholder="••••••••"
                   {...formik.getFieldProps('password')}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 dark:text-gray-400 focus:outline-none"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 focus:outline-none"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-              {formik.touched.password && formik.errors.password && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 flex items-center space-x-2 mt-1">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
-                  <span className="text-red-800 dark:text-red-200 text-sm">{formik.errors.password}</span>
-                </div>
-              )}
             </div>
-            <div className="flex items-center justify-between mt-2 mb-2">
-              <span className="h-px flex-1 bg-white/10" />
-              <span className="px-3 text-xs text-gray-400">or</span>
-              <span className="h-px flex-1 bg-white/10" />
-            </div>
-            <div className="flex justify-end">
+
+            <div className="flex items-center justify-between text-sm">
               <button
                 type="button"
-                className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors focus:outline-none"
+                className="text-gray-600 hover:text-gray-800"
                 tabIndex={-1}
                 onClick={() => navigate('/forgot-password')}
               >
-                Forgot password?
+                Forgot Password?
               </button>
-          </div>
-            <button
-              type="submit"
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition-all duration-200 text-white border-0 py-3 px-4 rounded-lg font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-base flex items-center justify-center"
-              disabled={loading}
-            >
-              {loading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Signing In...</span>
-                </div>
-              ) : (
-                'Sign In'
-              )}
-            </button>
-            <div className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
+              <button
+                type="submit"
+                className="px-4 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60"
+                disabled={loading}
+              >
+                {loading ? 'Logging in...' : 'Login'}
+              </button>
+            </div>
+
+            <div className="text-center text-sm text-gray-600 mt-4">
               Or{' '}
               <Link
                 to="/register"
-                className="font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
+                className="font-medium text-gray-900 hover:underline"
               >
                 create a new account
               </Link>
-          </div>
-        </form>
+            </div>
+          </form>
         </div>
       </div>
     </div>

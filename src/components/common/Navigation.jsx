@@ -76,8 +76,8 @@ export default function Navigation({ showBack = false, setSidebarOpen }) {
         <ConfirmationDialog
           message={
             <div className="text-center">
-              <div className="text-xl font-semibold text-white mb-2">See you soon!</div>
-              <div className="text-lg text-gray-300">Are you sure want to logout?</div>
+              <div className="text-xl font-semibold text-gray-800 mb-2">See you soon!</div>
+              <div className="text-sm text-gray-600">Are you sure you want to logout?</div>
             </div>
           }
           onConfirm={confirmLogout}

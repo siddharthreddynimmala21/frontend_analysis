@@ -1,7 +1,21 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import '../styles/landing.css';
 
 export default function Landing() {
+  const fullTitle = 'Land Your Dream Job with AI- Powered Interview and Resume Tools.';
+  const [typed, setTyped] = useState('');
+
+  useEffect(() => {
+    let i = 0;
+    const interval = setInterval(() => {
+      i += 1;
+      setTyped(fullTitle.slice(0, i));
+      if (i >= fullTitle.length) clearInterval(interval);
+    }, 30);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="landing-root">
       {/* Top Nav */}
@@ -12,9 +26,15 @@ export default function Landing() {
             <span className="brand-text">Resume Refiner</span>
           </div>
           <nav className="nav-links">
-            <a href="#features" className="nav-link" onClick={(e)=>e.preventDefault()}>Features</a>
+            <a
+              href="#features"
+              className="nav-link"
+              onClick={(e)=>{ e.preventDefault(); const el = document.getElementById('features'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}
+            >
+              Features
+            </a>
             <Link to="/login" className="nav-link">Login</Link>
-            <a href="#" className="btn btn-dark sm" onClick={(e)=>e.preventDefault()}>Sign Up for Free</a>
+            <Link to="/register" className="btn btn-dark sm">Sign Up for Free</Link>
           </nav>
         </div>
       </header>
@@ -22,18 +42,20 @@ export default function Landing() {
       {/* Hero */}
       <section className="landing-hero">
         <div className="landing-container hero-inner">
-          <h1 className="hero-title">
-            Land Your Dream Job with AI-
-            Powered Interview and Resume
-            Tools.
+          <h1 className="hero-title typewriter">
+            <span>{typed}</span>
           </h1>
           <p className="hero-sub">
             Practice targeted interviews, chat with your resume, and get instant feedback to refine
-            your application—powered by secure, reliable AI.
+            your application — powered by AI.
           </p>
           <div className="hero-actions">
-            <a href="#" className="btn btn-dark" onClick={(e)=>e.preventDefault()}>Sign Up for Free</a>
-            <a href="#how" className="btn btn-light" onClick={(e)=>e.preventDefault()}>
+            <Link to="/register" className="btn btn-dark">Sign Up for Free</Link>
+            <a
+              href="#how"
+              className="btn btn-light"
+              onClick={(e)=>{ e.preventDefault(); const el = document.getElementById('how'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}
+            >
               <span className="icon">⏺</span>
               See How It Works
             </a>
