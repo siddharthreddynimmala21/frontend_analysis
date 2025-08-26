@@ -3,6 +3,7 @@ import ConfirmationDialog from './common/ConfirmationDialog';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Shield } from 'lucide-react';
+import { API_BASE_URL } from '../services/api';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -13,6 +14,7 @@ export default function AdminDashboard() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [resumeCount, setResumeCount] = useState(null);
   const [interviewData, setInterviewData] = useState({ totalInterviews: 0, sessions: [] });
+  const [error, setError] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   // Carousel state
   const [sessionIndex, setSessionIndex] = useState(0); // which interview (session)
@@ -32,17 +34,20 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, limit: data.limit.toString(), search });
-      const res = await fetch(`/api/admin/users?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${user?.token}` },
+      const res = await fetch(`${API_BASE_URL}/api/admin/users?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${user?.token || localStorage.getItem('token')}` },
       });
       const json = await res.json();
       if (res.ok) {
         setData(prev => ({ ...prev, users: json.users, total: json.total, page: json.page, search }));
+        setError('');
       } else {
-        console.error('Failed to load users', json);
+        console.error('Failed to load users', res.status, json);
+        setError(`Failed to load users: ${res.status} ${json?.error || json?.message || ''}`.trim());
       }
     } catch (e) {
-      console.error(e);
+      console.error('Users fetch error:', e);
+      setError(`Error loading users: ${e?.message || e}`);
     } finally {
       setLoading(false);
     }
@@ -57,20 +62,23 @@ export default function AdminDashboard() {
     setSuggestLoading(true);
     try {
       const params = new URLSearchParams({ page: '1', limit: '5', search: query });
-      const res = await fetch(`/api/admin/users?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${user?.token}` },
+      const res = await fetch(`${API_BASE_URL}/api/admin/users?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${user?.token || localStorage.getItem('token')}` },
       });
       const json = await res.json();
       if (res.ok) {
         setSearchSuggestions(Array.isArray(json.users) ? json.users : []);
         setSuggestOpen(true);
+        setError('');
       } else {
         setSearchSuggestions([]);
         setSuggestOpen(false);
+        setError(`Search failed: ${res.status} ${json?.error || json?.message || ''}`.trim());
       }
     } catch (e) {
       setSearchSuggestions([]);
       setSuggestOpen(false);
+      setError(`Search error: ${e?.message || e}`);
     } finally {
       setSuggestLoading(false);
     }
@@ -87,15 +95,22 @@ export default function AdminDashboard() {
     setRoundIndexBySession({});
     try {
       const [rcRes, ivRes] = await Promise.all([
-        fetch(`/api/admin/users/${u._id}/resume-count`, { headers: { Authorization: `Bearer ${user?.token}` } }),
-        fetch(`/api/admin/users/${u._id}/interviews`, { headers: { Authorization: `Bearer ${user?.token}` } }),
+        fetch(`${API_BASE_URL}/api/admin/users/${u._id}/resume-count`, { headers: { Authorization: `Bearer ${user?.token || localStorage.getItem('token')}` } }),
+        fetch(`${API_BASE_URL}/api/admin/users/${u._id}/interviews`, { headers: { Authorization: `Bearer ${user?.token || localStorage.getItem('token')}` } }),
       ]);
       const rcJson = await rcRes.json();
       const ivJson = await ivRes.json();
       if (rcRes.ok) setResumeCount(rcJson.resumeUploadCount ?? 0);
       if (ivRes.ok) setInterviewData({ totalInterviews: ivJson.totalInterviews ?? 0, sessions: Array.isArray(ivJson.sessions) ? ivJson.sessions : [] });
+      if (!rcRes.ok || !ivRes.ok) {
+        console.error('Detail fetch failed', { rcStatus: rcRes.status, ivStatus: ivRes.status, rcJson, ivJson });
+        setError(`Failed to load details: rc ${rcRes.status}, iv ${ivRes.status}`);
+      } else {
+        setError('');
+      }
     } catch (e) {
       console.error('Failed loading user details', e);
+      setError(`Error loading details: ${e?.message || e}`);
     } finally {
       setDetailLoading(false);
     }
@@ -163,6 +178,12 @@ export default function AdminDashboard() {
             <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
               <Shield className="w-4 h-4 text-gray-700" />
             </div>
+
+        {error ? (
+          <div className="mb-4 p-3 border border-red-300 bg-red-50 text-red-800 rounded">
+            {error}
+          </div>
+        ) : null}
             <div className="text-xl font-semibold">Resume Refiner</div>
           </div>
           <nav className="space-y-1">
@@ -190,6 +211,11 @@ export default function AdminDashboard() {
         {/* Main content */}
         <main className="flex-1 p-6 overflow-y-auto max-h-screen">
           {/* Top bar */}
+          {error && (
+            <div className="mb-4 p-3 border border-red-300 bg-red-50 text-red-800 rounded">
+              {error}
+            </div>
+          )}
           <div className="flex items-center justify-between mb-6">
             <div>
               <div className="text-sm text-gray-500">Admin Panel</div>
