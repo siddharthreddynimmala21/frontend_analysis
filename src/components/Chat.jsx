@@ -45,20 +45,20 @@ function CustomDropdown({ value, onChange, disabled, options }) {
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
-        className={`w-full p-2 bg-gray-700 border border-gray-600 rounded text-sm text-white flex items-center justify-between ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        className={`w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 flex items-center justify-between ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
       >
         <span>{selectedOption.label}</span>
-        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 text-gray-600 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
       </button>
       
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-50 max-h-48 overflow-y-auto">
           {options.map((option) => (
             <div
               key={option.value}
-              className={`p-2 hover:bg-gray-600 cursor-pointer ${option.value === value ? 'bg-blue-500/20' : ''}`}
+              className={`p-2 hover:bg-gray-50 cursor-pointer ${option.value === value ? 'bg-gray-100' : ''}`}
               onClick={() => {
                 onChange(option.value);
                 setIsOpen(false);
@@ -817,29 +817,29 @@ export default function Chat() {
   const isResumeDeleted = currentSession && !currentResume && currentSession.resumeId;
 
   return (
-    <div className="flex h-screen bg-gray-900 text-white relative">
+    <div className="flex h-screen bg-white text-gray-900 relative">
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 w-64 bg-gray-800 p-4 border-r border-gray-700 transform ${sidebarOpen ? 'translate-x-0 z-50' : '-translate-x-full z-40'} lg:relative lg:translate-x-0 lg:w-1/4 transition-transform duration-300 ease-in-out`}>
+      <div className={`fixed inset-y-0 left-0 w-64 bg-white p-4 border-r border-gray-200 transform ${sidebarOpen ? 'translate-x-0 z-50' : '-translate-x-full z-40'} lg:relative lg:translate-x-0 lg:w-1/4 transition-transform duration-300 ease-in-out`}>
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
-          <div className="p-4 border-b border-white/20">
+          <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Chat History</h2>
+              <h2 className="text-lg font-semibold">Chats</h2>
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="lg:hidden p-1 hover:bg-white/10 rounded absolute top-4 right-4"
+                className="lg:hidden p-1 hover:bg-gray-100 rounded absolute top-4 right-4"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-gray-600" />
               </button>
             </div>
-            <div className="text-xs text-gray-400 mb-2">
+            <div className="text-xs text-gray-500 mb-2">
               Active Chats: {chatSessions.length}/{MAX_ACTIVE_CHATS}
             </div>
 
             {/* Resume Selection Dropdown */}
             <div className="mb-3 relative">
               {isLoadingResumes ? (
-                <div className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-sm text-white flex items-center justify-center">
+                <div className="w-full p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-700 flex items-center justify-center">
                   <div className="animate-pulse">Loading resumes...</div>
                 </div>
               ) : resumes.length > 0 ? (
@@ -864,7 +864,7 @@ export default function Chat() {
                   ]}
                 />
               ) : (
-                <div className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-sm text-white text-center">
+                <div className="w-full p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-700 text-center">
                   No resumes available
                 </div>
               )}
@@ -874,7 +874,7 @@ export default function Chat() {
             <button
               onClick={createNewChat}
               disabled={isCreatingChat || chatSessions.length >= MAX_ACTIVE_CHATS}
-              className="w-full flex items-center justify-center space-x-2 p-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-sm transition-colors"
+              className="w-full flex items-center justify-center space-x-2 p-2 bg-gray-900 hover:bg-black disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors border border-gray-900"
             >
               <Plus className="w-4 h-4" />
               <span>
@@ -901,26 +901,26 @@ export default function Chat() {
             {chatSessions.map((session) => (
               <div
                 key={session.id}
-                className={`p-3 mb-2 rounded-lg cursor-pointer transition-colors ${
+                className={`p-3 mb-2 rounded-lg cursor-pointer transition-colors border ${
                   currentChatId === session.id 
-                    ? 'bg-blue-500/20 border border-blue-500/40' 
-                    : 'bg-white/5 hover:bg-white/10'
+                    ? 'bg-gray-50 border-gray-300' 
+                    : 'bg-white hover:bg-gray-50 border-gray-200'
                 }`}
                 onClick={() => switchToChat(session.id)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{session.name}</p>
-                    <p className="text-xs text-gray-400 truncate">{session.lastMessage || 'No messages yet'}</p>
+                    <p className="font-medium truncate text-gray-900">{session.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{session.lastMessage || 'No messages yet'}</p>
                   </div>
                   <button
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteChat(session.id);
                       }}
-                      className="p-1 hover:bg-white/10 rounded"
+                      className="p-1 hover:bg-gray-100 rounded"
                     >
-                      <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                      <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-500" />
                     </button>
                   </div>
                 </div>
@@ -928,13 +928,13 @@ export default function Chat() {
             </div>
             
             {/* Resume Management */}
-            <div className="p-4 border-t border-white/20">
+            <div className="p-4 border-t border-gray-200">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-400">Resumes ({resumes.length}/3)</span>
+                <span className="text-sm text-gray-600">Resumes ({resumes.length}/3)</span>
                 {resumes.length < 3 && (
-                  <label className="flex items-center space-x-1 px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs cursor-pointer transition-colors">
+                  <label className="flex items-center space-x-1 px-2 py-1 bg-gray-900 hover:bg-black text-white rounded text-xs cursor-pointer transition-colors border border-gray-900">
                     <Upload className="w-3 h-3" />
-                    <span>{isUploading ? 'Uploading...' : 'Add'}</span>
+                    <span>{isUploading ? 'Uploading...' : 'Upload PDF'}</span>
                     <input
                       type="file"
                       accept=".pdf"
@@ -946,13 +946,13 @@ export default function Chat() {
                 )}
               </div>
               {resumes.map((resume, index) => (
-                <div key={resume.id} className="flex items-center justify-between p-2 bg-white/5 rounded mb-1">
-                  <span className="text-xs text-gray-300 truncate flex-1">
+                <div key={resume.id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200 mb-1">
+                  <span className="text-xs text-gray-700 truncate flex-1">
                     {index + 1}. {resume.fileName.length > 20 ? resume.fileName.substring(0, 20) + '...' : resume.fileName}
                   </span>
                   <button
                     onClick={() => handleDeleteResume(resume.id)}
-                    className="p-1 hover:bg-red-500/20 text-red-400 rounded ml-2"
+                    className="p-1 hover:bg-red-50 text-red-600 rounded ml-2"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -968,7 +968,7 @@ export default function Chat() {
         {/* Overlay for mobile when sidebar is open */}
         {sidebarOpen && (
           <div 
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            className="fixed inset-0 bg-black/30 z-40 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           ></div>
         )}
@@ -987,25 +987,25 @@ export default function Chat() {
         
         <div className="flex-1 flex flex-col px-2 sm:px-4 md:mt-8">
           <motion.div 
-            className="w-[95vw] max-w-5xl mx-auto flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-white/20 h-[calc(100vh-5rem)] lg:h-[calc(100vh-8rem)]"
+            className="w-[95vw] max-w-5xl mx-auto flex flex-col bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200 h-[calc(100vh-5rem)] lg:h-[calc(100vh-8rem)]"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
             exit="hidden"
           >
             {/* Header */}
-            <div className="p-4 border-b border-white/20 bg-white/5">
+            <div className="p-4 border-b border-gray-200 bg-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <h1 className="text-xl font-bold text-white whitespace-nowrap">Chat with AI</h1>
+                  <h1 className="text-xl font-semibold text-gray-900 whitespace-nowrap">AI Chat</h1>
                   {currentChatId && (
-                    <div className="text-sm text-gray-400">
+                    <div className="text-sm text-gray-500">
                       {messages.filter(msg => !msg.isBot).length}/{MAX_USER_MESSAGES_PER_CHAT}
                     </div>
                   )}
                 </div>
                 {selectedResumeId && (
-                  <div className="text-xs text-green-400">
+                  <div className="text-xs text-gray-600">
                     {resumes.find(r => r.id === selectedResumeId)?.fileName.substring(0, 20)}
                     {resumes.find(r => r.id === selectedResumeId)?.fileName.length > 20 ? '...' : ''}
                   </div>
@@ -1017,9 +1017,9 @@ export default function Chat() {
             {isLoadingResumes ? (
               <div className="flex-1 flex items-center justify-center p-8">
                 <div className="text-center">
-                  <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Loading Resumes</h3>
-                  <p className="text-gray-300 mb-6">
+                  <div className="w-16 h-16 border-4 border-gray-300 border-t-gray-900 rounded-full animate-spin mx-auto mb-4"></div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Loading Resumes</h3>
+                  <p className="text-gray-500 mb-6">
                     Please wait while we load your resumes...
                   </p>
                 </div>
@@ -1027,12 +1027,12 @@ export default function Chat() {
             ) : resumes.length === 0 && !currentChatId && (
               <div className="flex-1 flex items-center justify-center p-8">
                 <div className="text-center">
-                  <AlertCircle className="w-16 h-16 text-blue-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">Upload Your First Resume</h3>
-                  <p className="text-gray-300 mb-6">
+                  <AlertCircle className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload Your First Resume</h3>
+                  <p className="text-gray-600 mb-6">
                     Upload your resume (PDF) to start an intelligent conversation. You can upload up to 3 resumes.
                   </p>
-                  <label className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg cursor-pointer transition-colors">
+                  <label className="inline-flex items-center space-x-2 px-6 py-3 bg-gray-900 hover:bg-black text-white rounded-lg cursor-pointer transition-colors border border-gray-900">
                     <Upload className="w-5 h-5" />
                     <span>{isUploading ? 'Uploading...' : 'Choose PDF'}</span>
                     <input
@@ -1044,9 +1044,9 @@ export default function Chat() {
                     />
                   </label>
                   {isUploading && (
-                    <div className="flex flex-col items-center justify-center space-y-2 text-blue-400 mt-4">
+                    <div className="flex flex-col items-center justify-center space-y-2 text-gray-600 mt-4">
                       <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
                         <span className="text-sm">Processing...</span>
                       </div>
                     </div>
@@ -1061,8 +1061,8 @@ export default function Chat() {
               <div className="flex-1 flex items-center justify-center p-8">
                 <div className="text-center">
                   <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">Start a New Chat</h3>
-                  <p className="text-gray-300 mb-6">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Start a New Chat</h3>
+                  <p className="text-gray-600 mb-6">
                     Create a new chat to get started with your selected resume.
                   </p>
                 </div>
@@ -1072,14 +1072,14 @@ export default function Chat() {
             {/* Messages container */}
             {!isLoadingResumes && currentChatId && (
               <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                   {messages.map((message, index) => (
                     <motion.div
                       key={index}
                       variants={messageVariants}
-                      initial="visible" // Changed from "hidden" to "visible" to prevent disappearing
+                      initial="visible"
                       animate="visible"
-                      exit="visible" // Added exit animation state
+                      exit="visible"
                     >
                       <ChatMessage
                         message={message.text}
@@ -1089,8 +1089,8 @@ export default function Chat() {
                   ))}
                   {isLoading && (
                     <div className="flex items-center space-x-2">
-                        <div className="w-10 h-10 rounded-full bg-gray-700/50 flex-shrink-0"></div>
-                        <div className="p-3 bg-gray-700/50 rounded-lg">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0"></div>
+                        <div className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
                             <div className="flex space-x-1">
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-75"></div>
@@ -1102,10 +1102,10 @@ export default function Chat() {
                   
                   {resumes.length === 0 && messages.length === 0 && (
                     <div className="flex items-center justify-center h-full">
-                      <div className="text-center p-6 bg-white/5 rounded-lg">
-                        <MessageSquare className="w-12 h-12 text-blue-400 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-white mb-2">General Chat Mode</h3>
-                        <p className="text-sm text-gray-300">
+                      <div className="text-center p-6 bg-white rounded-lg border border-gray-200">
+                        <MessageSquare className="w-12 h-12 text-gray-500 mx-auto mb-3" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">General Chat Mode</h3>
+                        <p className="text-sm text-gray-600">
                           You're chatting without a resume. For personalized resume analysis, upload a resume using the sidebar.
                         </p>
                       </div>
@@ -1114,7 +1114,7 @@ export default function Chat() {
                 </div>
 
                 {/* Input area */}
-                <div className="p-4 border-t border-white/20">
+                <div className="p-4 border-t border-gray-200 bg-white">
                   <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
                 </div>
               </>
@@ -1122,7 +1122,7 @@ export default function Chat() {
 
             {/* Resume Deletion Warning */}
             {isResumeDeleted && (
-              <div className="bg-yellow-200 text-yellow-900 p-2 rounded mb-2 flex items-center">
+              <div className="bg-yellow-50 text-yellow-800 p-2 rounded mb-2 flex items-center border border-yellow-200">
                 <AlertCircle className="w-5 h-5 mr-2" />
                 This resume has been deleted. You can still view the chat history.
               </div>

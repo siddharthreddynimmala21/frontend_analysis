@@ -33,7 +33,13 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem('token');
     
     if (token && isTokenValid(token)) {
-      setUser({ token });
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const isAdmin = !!payload.isAdmin;
+        setUser({ token, isAdmin });
+      } catch (e) {
+        setUser({ token });
+      }
     } else if (token) {
       // Token exists but is invalid - remove it
       localStorage.removeItem('token');
@@ -44,7 +50,13 @@ export const AuthProvider = ({ children }) => {
 
   const login = (token) => {
     localStorage.setItem('token', token);
-    setUser({ token });
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const isAdmin = !!payload.isAdmin;
+      setUser({ token, isAdmin });
+    } catch (e) {
+      setUser({ token });
+    }
   };
 
   const logout = () => {
@@ -59,6 +71,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     isAuthenticated: !!user,
+    isAdmin: !!user?.isAdmin,
   };
 
   return (

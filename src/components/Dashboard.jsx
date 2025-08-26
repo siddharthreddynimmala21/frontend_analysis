@@ -6,7 +6,7 @@ import ConfirmationDialog from './common/ConfirmationDialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, isAdmin } = useAuth();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [showProfileInfo, setShowProfileInfo] = useState(false);
@@ -71,12 +71,22 @@ export default function Dashboard() {
             >
               Dashboard
             </button>
-            <button
-              className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
-              onClick={() => setShowProfileInfo(true)}
-            >
-              My Profile
-            </button>
+            {isAdmin && (
+              <button
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                onClick={() => navigate('/admin')}
+              >
+                Admin
+              </button>
+            )}
+            {!isAdmin && (
+              <button
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                onClick={() => setShowProfileInfo(true)}
+              >
+                My Profile
+              </button>
+            )}
             <button
               className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
               onClick={handleLogout}
@@ -103,14 +113,17 @@ export default function Dashboard() {
             </button> */}
           </div>
 
-          {/* Action blocks */}
-          <div className="space-y-5 max-w-3xl">
+          {/* Action blocks: 2x2 grid of large cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-5xl">
             {/* Start Interview */}
-            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5">
-              <MessageSquare className="w-5 h-5 text-gray-700 mb-3" />
-              <div className="text-gray-700 mb-3">Start a practice interview session.</div>
+            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5 h-56 flex flex-col justify-between">
+              <div>
+                <MessageSquare className="w-5 h-5 text-gray-700 mb-3" />
+                <div className="text-gray-900 font-medium mb-1">AI Interview</div>
+                <div className="text-gray-700 text-sm">Start a practice interview session tailored to your role and skills. Assess fundamentals and prepare effectively.</div>
+              </div>
               <button
-                className="px-4 py-2 bg-black text-white rounded-md text-sm"
+                className="px-4 py-2 bg-black text-white rounded-md text-sm self-start"
                 onClick={() => navigate('/ai-interview')}
               >
                 Start Now
@@ -118,11 +131,14 @@ export default function Dashboard() {
             </div>
 
             {/* Open Chat */}
-            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5">
-              <FileText className="w-5 h-5 text-gray-700 mb-3" />
-              <div className="text-gray-700 mb-3">Ask questions about your resume.</div>
+            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5 h-56 flex flex-col justify-between">
+              <div>
+                <FileText className="w-5 h-5 text-gray-700 mb-3" />
+                <div className="text-gray-900 font-medium mb-1">Resume Q&A</div>
+                <div className="text-gray-700 text-sm">Ask targeted questions about your resume and experience. Clarify achievements and improve articulation.</div>
+              </div>
               <button
-                className="px-4 py-2 bg-black text-white rounded-md text-sm"
+                className="px-4 py-2 bg-black text-white rounded-md text-sm self-start"
                 onClick={() => navigate('/chat')}
               >
                 Open Chat
@@ -130,14 +146,29 @@ export default function Dashboard() {
             </div>
 
             {/* Get Feedback */}
-            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5">
-              <Wand2 className="w-5 h-5 text-gray-700 mb-3" />
-              <div className="text-gray-700 mb-3">Get feedback to improve your resume.</div>
+            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5 h-56 flex flex-col justify-between">
+              <div>
+                <Wand2 className="w-5 h-5 text-gray-700 mb-3" />
+                <div className="text-gray-900 font-medium mb-1">Resume Feedback</div>
+                <div className="text-gray-700 text-sm">Receive actionable suggestions to improve clarity, impact, and ATS fit. Optimize content and formatting.</div>
+              </div>
               <button
-                className="px-4 py-2 bg-black text-white rounded-md text-sm"
+                className="px-4 py-2 bg-black text-white rounded-md text-sm self-start"
                 onClick={() => navigate('/resume-analyzer')}
               >
                 Get Feedback
+              </button>
+            </div>
+
+            {/* Resume based interview */}
+            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5 h-56 flex flex-col justify-between">
+              <div>
+                <FileText className="w-5 h-5 text-gray-700 mb-3" />
+                <div className="text-gray-900 font-medium mb-1">Resume-based Interview</div>
+                <div className="text-gray-700 text-sm">Generate an interview plan directly from your resume highlights and target role. Practice where it matters most.</div>
+              </div>
+              <button className="px-4 py-2 bg-black text-white rounded-md text-sm self-start">
+                Start Now
               </button>
             </div>
           </div>

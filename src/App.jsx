@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import ProtectedAdminRoute from './components/auth/ProtectedAdminRoute';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import Chat from './components/Chat';
@@ -14,6 +15,7 @@ import ResumeAnalyzer from './components/ResumeAnalyzer';
 import ForgotPassword from './components/auth/ForgotPassword';
 import AIInterview from './components/AIInterview';
 import Landing from './components/Landing';
+import AdminDashboard from './components/AdminDashboard';
 
 function App() {
   return (
@@ -25,6 +27,14 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedAdminRoute>
+                <AdminDashboard />
+              </ProtectedAdminRoute>
+            }
+          />
           <Route
             path="/dashboard"
             element={
