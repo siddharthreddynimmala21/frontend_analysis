@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { login } from '../../services/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LogIn, AlertTriangle, Eye, EyeOff, Shield } from 'lucide-react';
+import { LogIn, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -59,12 +59,11 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white text-gray-900 px-4 py-12">
       <div className="w-full max-w-sm bg-white rounded-xl shadow-xl border border-gray-200">
-        {/* Header with icon and tabs */}
+        {/* Header with logo and tabs */}
         <div className="p-6">
-          <div className="flex justify-center mb-4">
-            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-gray-700" />
-            </div>
+          <div className="flex justify-center items-center gap-2 mb-4 select-none">
+            <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-10 h-10 object-contain" />
+            <span className="text-xl font-semibold tracking-tight">ResumeRefiner</span>
           </div>
           <div className="flex bg-gray-200 rounded-lg p-1">
             <button type="button" className="flex-1 py-2 rounded-md bg-white border border-gray-200 text-gray-900 font-medium">Login</button>

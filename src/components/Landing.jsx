@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { MessageSquare, FileText, Wand2, Upload } from 'lucide-react';
 import '../styles/landing.css';
 
 export default function Landing() {
@@ -22,8 +23,8 @@ export default function Landing() {
       <header className="landing-nav">
         <div className="landing-container nav-inner">
           <div className="brand">
-            <span className="brand-icon" aria-hidden>🛡️</span>
-            <span className="brand-text">Resume Refiner</span>
+            <img src="/new_logo.png" alt="ResumeRefiner Logo" className="brand-logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+            <span className="brand-text">ResumeRefiner</span>
           </div>
           <nav className="nav-links">
             <a
@@ -71,7 +72,9 @@ export default function Landing() {
 
           <div className="feature-list">
             <div className="feature-card">
-              <div className="feature-icon">💬</div>
+              <div className="feature-icon" aria-hidden>
+                <MessageSquare style={{ width: 20, height: 20, color: '#374151' }} />
+              </div>
               <div className="feature-body">
                 <div className="feature-title">AI Mock Interviews</div>
                 <div className="feature-desc">Practice interviews tailored to your job description.</div>
@@ -79,7 +82,9 @@ export default function Landing() {
             </div>
 
             <div className="feature-card">
-              <div className="feature-icon">📄</div>
+              <div className="feature-icon" aria-hidden>
+                <FileText style={{ width: 20, height: 20, color: '#374151' }} />
+              </div>
               <div className="feature-body">
                 <div className="feature-title">Chat with Your Resume</div>
                 <div className="feature-desc">Get instant, AI-driven answers about your career history.</div>
@@ -87,7 +92,9 @@ export default function Landing() {
             </div>
 
             <div className="feature-card">
-              <div className="feature-icon">✂️</div>
+              <div className="feature-icon" aria-hidden>
+                <Wand2 style={{ width: 20, height: 20, color: '#374151' }} />
+              </div>
               <div className="feature-body">
                 <div className="feature-title">Resume Analysis</div>
                 <div className="feature-desc">Receive actionable feedback to refine and optimize your resume.</div>
@@ -106,7 +113,9 @@ export default function Landing() {
           <div className="how-list">
             <div className="how-card">
               <div className="how-num">1</div>
-              <div className="how-thumb" />
+              <div className="how-thumb" aria-hidden>
+                <Upload style={{ width: 20, height: 20, color: '#374151' }} />
+              </div>
               <div className="how-body">
                 <div className="how-title">Upload Resume</div>
                 <div className="how-desc">Add your PDF or DOCX resume to begin.</div>
@@ -115,7 +124,9 @@ export default function Landing() {
 
             <div className="how-card">
               <div className="how-num">2</div>
-              <div className="how-thumb" />
+              <div className="how-thumb" aria-hidden>
+                <MessageSquare style={{ width: 20, height: 20, color: '#374151' }} />
+              </div>
               <div className="how-body">
                 <div className="how-title">Select a Tool</div>
                 <div className="how-desc">Choose Mock Interview, Chat, or Analysis.</div>
@@ -124,7 +135,9 @@ export default function Landing() {
 
             <div className="how-card">
               <div className="how-num">3</div>
-              <div className="how-thumb" />
+              <div className="how-thumb" aria-hidden>
+                <Wand2 style={{ width: 20, height: 20, color: '#374151' }} />
+              </div>
               <div className="how-body">
                 <div className="how-title">Achieve Your Goals</div>
                 <div className="how-desc">Get insights, practice answers, and level up your profile.</div>

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import ConfirmationDialog from './common/ConfirmationDialog';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Shield } from 'lucide-react';
 import { API_BASE_URL } from '../services/api';
 
 export default function AdminDashboard() {
@@ -14,6 +13,7 @@ export default function AdminDashboard() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [resumeCount, setResumeCount] = useState(null);
   const [interviewData, setInterviewData] = useState({ totalInterviews: 0, sessions: [] });
+  const [interviewCounts, setInterviewCounts] = useState({}); // { [userId]: number }
   const [error, setError] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   // Carousel state
@@ -41,6 +41,35 @@ export default function AdminDashboard() {
       if (res.ok) {
         setData(prev => ({ ...prev, users: json.users, total: json.total, page: json.page, search }));
         setError('');
+        // Kick off fetching interview counts for listed users (best-effort)
+        try {
+          const token = user?.token || localStorage.getItem('token');
+          const usersList = Array.isArray(json.users) ? json.users : [];
+          const toFetch = usersList.filter(u => u && u._id && typeof interviewCounts[u._id] === 'undefined');
+          if (toFetch.length) {
+            const results = await Promise.allSettled(
+              toFetch.map(u => fetch(`${API_BASE_URL}/api/admin/users/${u._id}/interviews`, {
+                headers: { Authorization: `Bearer ${token}` }
+              }).then(r => r.json().then(j => ({ ok: r.ok, data: j }))))
+            );
+            const updates = {};
+            results.forEach((rs, i) => {
+              const uid = toFetch[i]._id;
+              if (rs.status === 'fulfilled' && rs.value?.ok) {
+                updates[uid] = rs.value.data?.totalInterviews ?? 0;
+              } else {
+                // mark as 0 to avoid repeated retries during this view
+                updates[uid] = 0;
+              }
+            });
+            if (Object.keys(updates).length) {
+              setInterviewCounts(prev => ({ ...prev, ...updates }));
+            }
+          }
+        } catch (e) {
+          // Non-fatal; keep UI responsive
+          console.warn('Interview counts fetch error:', e);
+        }
       } else {
         console.error('Failed to load users', res.status, json);
         setError(`Failed to load users: ${res.status} ${json?.error || json?.message || ''}`.trim());
@@ -174,18 +203,22 @@ export default function AdminDashboard() {
       <div className="flex">
         {/* Sidebar */}
         <aside className="w-60 border-r border-gray-200 h-screen p-4 sticky top-0 overflow-hidden">
-          <div className="flex items-center gap-2 px-2 mb-6">
-            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-gray-700" />
+          <button
+            type="button"
+            aria-label="Go to Dashboard"
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+          >
+            <div className="w-8 h-8 flex items-center justify-center">
+              <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-8 h-8 object-contain rounded" />
             </div>
-
-        {error ? (
-          <div className="mb-4 p-3 border border-red-300 bg-red-50 text-red-800 rounded">
-            {error}
-          </div>
-        ) : null}
             <div className="text-xl font-semibold">Resume Refiner</div>
-          </div>
+          </button>
+          {error ? (
+            <div className="mb-4 p-3 border border-red-300 bg-red-50 text-red-800 rounded">
+              {error}
+            </div>
+          ) : null}
           <nav className="space-y-1">
             <button
               className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
@@ -273,9 +306,10 @@ export default function AdminDashboard() {
           <div className="space-y-5">
             {/* Users list - full width */}
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-              <div className="grid grid-cols-3 font-medium text-gray-900 mb-2">
+              <div className="grid grid-cols-4 font-medium text-gray-900 mb-2">
                 <div>Email</div>
                 <div>Resumes</div>
+                <div>Interviews</div>
                 <div>Created</div>
               </div>
               <div className="divide-y divide-gray-200 border-t border-b border-gray-200">
@@ -286,10 +320,11 @@ export default function AdminDashboard() {
                     <button
                       key={u._id}
                       onClick={() => fetchUserDetails(u)}
-                      className={`grid grid-cols-3 w-full text-left py-3 hover:bg-gray-100 ${selectedUser?._id === u._id ? 'bg-gray-100' : ''}`}
+                      className={`grid grid-cols-4 w-full text-left py-3 hover:bg-gray-100 ${selectedUser?._id === u._id ? 'bg-gray-100' : ''}`}
                     >
                       <div className="truncate text-gray-900">{u.email}</div>
                       <div className="text-gray-700">{u.resumeUploadCount ?? 0}</div>
+                      <div className="text-gray-700">{typeof interviewCounts[u._id] !== 'undefined' ? interviewCounts[u._id] : '—'}</div>
                       <div className="text-gray-700">{u.createdAt ? new Date(u.createdAt).toLocaleString() : '-'}</div>
                     </button>
                   ))

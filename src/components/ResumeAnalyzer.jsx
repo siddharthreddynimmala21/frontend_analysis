@@ -5,12 +5,14 @@ import remarkGfm from 'remark-gfm';
 import { motion } from 'framer-motion';
 import { FileText, Upload, Briefcase, Wand2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import Navigation from './common/Navigation';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { analyzeResume } from '../services/api';
+import ConfirmationDialog from './common/ConfirmationDialog';
 
 export default function ResumeAnalyzer() {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout, isAdmin } = useAuth();
   const [currentRole, setCurrentRole] = useState('');
   const [targetRole, setTargetRole] = useState('');
   const [experience, setExperience] = useState('');
@@ -20,6 +22,7 @@ export default function ResumeAnalyzer() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [jobDescriptionOption, setJobDescriptionOption] = useState('paste'); // 'paste' or 'generate'
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -132,51 +135,97 @@ export default function ResumeAnalyzer() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 to-black text-white p-4">
-      <Navigation showBack={true} />
-      
+    <div className="flex h-screen overflow-hidden bg-white text-gray-900">
+      {/* Sidebar (fixed, Dashboard/Chat style) */}
+      <aside className="fixed inset-y-0 left-0 w-60 border-r border-gray-200 p-4 hidden sm:flex flex-col bg-white">
+        <button
+          type="button"
+          aria-label="Go to Dashboard"
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+        >
+          <div className="w-8 h-8 flex items-center justify-center">
+            <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-8 h-8 object-contain rounded" />
+          </div>
+          <div className="text-xl font-semibold">Resume Refiner</div>
+        </button>
+        <nav className="space-y-1">
+          <button
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+            onClick={() => navigate('/dashboard')}
+          >
+            Dashboard
+          </button>
+          {isAdmin && (
+            <button
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+              onClick={() => navigate('/admin')}
+            >
+              Admin
+            </button>
+          )}
+          {!isAdmin && (
+            <button
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+              onClick={() => alert('Profile feature is coming soon.')}
+            >
+              My Profile
+            </button>
+          )}
+          <button
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+            onClick={() => setShowLogoutConfirm(true)}
+          >
+            Logout
+          </button>
+        </nav>
+      </aside>
+
+      {/* Content wrapper shifted to accommodate fixed sidebar */}
+      <div className="flex flex-1 w-full ml-0 sm:ml-60 h-screen px-4 py-4 overflow-hidden">
       {/* Loading Overlay */}
       {isLoading && (
         <motion.div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4"
+          className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
         >
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
             <div className="flex justify-center mb-6">
               <svg className="animate-spin h-12 w-12 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </div>
-            <h3 className="text-xl font-bold mb-4">Analyzing Your Resume</h3>
-            <p className="text-gray-300 mb-6">This may take a few moments.</p>
-            <p className="text-gray-300 font-medium">Feel free to close the application — we'll email your personalized Resume Analysis Report shortly!</p>
+            <h3 className="text-xl font-bold mb-4 text-gray-900">Analyzing Your Resume</h3>
+            <p className="text-gray-600 mb-6">This may take a few moments.</p>
+            <p className="text-gray-700 font-medium">Feel free to close the application — we'll email your personalized Resume Analysis Report shortly!</p>
           </div>
         </motion.div>
       )}
       
       <motion.div 
-        className="flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto mt-6 sm:mt-16"
+        className="flex-1 flex flex-col justify-center relative w-full max-w-5xl mx-auto my-0"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
         
         <motion.div
-          className="w-full bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-6 md:p-8 mt-12"
+          className="w-full bg-white border border-gray-200 rounded-2xl shadow-lg p-4 md:p-6 flex flex-col h-auto"
           variants={cardVariants}
         >
           <div className="mb-6 flex items-center">
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center mr-4">
+            <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center mr-4">
               <Briefcase className="w-6 h-6 text-white" />
             </div>
             <h2 className="text-xl font-bold">Analyze Your Resume</h2>
           </div>
-          
+          {/* Content area */}
+          <div>
           {error && (
-            <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200">
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
               {error}
             </div>
           )}
@@ -187,13 +236,13 @@ export default function ResumeAnalyzer() {
                 Upload Resume (PDF)
               </label>
               <div className="flex items-center justify-center w-full">
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white/5 border-white/20 hover:bg-white/10">
+                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 border-gray-300 hover:bg-gray-100">
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="w-8 h-8 mb-3 text-gray-400" />
-                    <p className="mb-2 text-sm text-gray-400">
+                    <Upload className="w-8 h-8 mb-3 text-gray-500" />
+                    <p className="mb-2 text-sm text-gray-600">
                       <span className="font-semibold">Click to upload</span> or drag and drop
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-500">
                       PDF files only (MAX. 10MB)
                     </p>
                   </div>
@@ -208,14 +257,14 @@ export default function ResumeAnalyzer() {
                 </label>
               </div>
               {selectedFile && (
-                <div className="mt-2 flex items-center text-sm text-blue-300">
-                  <FileText className="w-4 h-4 mr-2" />
+                <div className="mt-2 flex items-center text-sm text-blue-700">
+                  <FileText className="w-4 h-4 mr-2 text-blue-700" />
                   {selectedFile.name}
                 </div>
               )}
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium mb-2" htmlFor="currentRole">
                   Current Role
@@ -223,14 +272,13 @@ export default function ResumeAnalyzer() {
                 <input
                   id="currentRole"
                   type="text"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                  className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
                   placeholder="e.g., Software Engineer"
                   value={currentRole}
                   onChange={(e) => setCurrentRole(e.target.value)}
                   disabled={isLoading}
                 />
               </div>
-              
               <div>
                 <label className="block text-sm font-medium mb-2" htmlFor="targetRole">
                   Target Role
@@ -238,30 +286,29 @@ export default function ResumeAnalyzer() {
                 <input
                   id="targetRole"
                   type="text"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                  className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
                   placeholder="e.g., Senior Software Engineer"
                   value={targetRole}
                   onChange={(e) => setTargetRole(e.target.value)}
                   disabled={isLoading}
                 />
               </div>
-            </div>
-            
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" htmlFor="experience">
-                Years of Experience
-              </label>
-              <input
-                id="experience"
-                type="number"
-                min="0"
-                step="1"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
-                placeholder="e.g., 3"
-                value={experience}
-                onChange={(e) => setExperience(e.target.value)}
-                disabled={isLoading}
-              />
+              <div>
+                <label className="block text-sm font-medium mb-2" htmlFor="experience">
+                  Years of Experience
+                </label>
+                <input
+                  id="experience"
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
+                  placeholder="e.g., 3"
+                  value={experience}
+                  onChange={(e) => setExperience(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
             </div>
             
             <div className="mb-6">
@@ -300,20 +347,20 @@ export default function ResumeAnalyzer() {
               {jobDescriptionOption === 'paste' ? (
                 <textarea
                   id="jobDescription"
-                  rows="5"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                  rows="4"
+                  className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
                   placeholder="Paste the job description here..."
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
                   disabled={isLoading}
                 ></textarea>
               ) : (
-                <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex items-center">
-                  <Wand2 className="w-5 h-5 text-purple-400 mr-3" />
-                  <p className="text-sm text-gray-300">
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg flex items-center">
+                  <Wand2 className="w-5 h-5 text-gray-700 mr-3" />
+                  <p className="text-sm text-gray-700">
                     We'll generate a job description based on your target role and experience.
                     <br />
-                    <span className="text-xs text-gray-400 mt-1 block">
+                    <span className="text-xs text-gray-500 mt-1 block">
                       This will be used for analysis.
                     </span>
                   </p>
@@ -321,32 +368,34 @@ export default function ResumeAnalyzer() {
               )}
             </div>
             
-            <button
-              type="submit"
-              className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 ${isLoading ? 'bg-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'}`}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Analyzing Resume...
-                </span>
-              ) : 'Analyze Resume'}
-            </button>
-          </form>
+            {/* Submit area */}
+            <div className="mt-4 pt-4 border-t">
+              <button
+                type="submit"
+                className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 ${isLoading ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-900'}`}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Analyzing Resume...
+                  </span>
+                ) : 'Analyze Resume'}
+              </button>
+            </div>
+            </form>
           
           {result && (
             <motion.div 
-              className="mt-8 p-6 bg-white/5 border border-white/20 rounded-xl text-white"
+              className="mt-6 p-4 bg-white border border-gray-200 rounded-xl text-gray-800"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <h3 className="text-lg font-semibold mb-4">Analysis Results</h3>
-              {/* Render markdown properly; inherit dark theme colors */}
+              <h3 className="text-lg font-semibold mb-3">Analysis Results</h3>
               <div className="max-w-none">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -365,8 +414,25 @@ export default function ResumeAnalyzer() {
               </div>
             </motion.div>
           )}
+          </div>
         </motion.div>
       </motion.div>
+      </div>
+
+      {showLogoutConfirm && (
+        <ConfirmationDialog
+          message={
+            <div className="text-center">
+              <div className="text-xl font-semibold text-gray-800 mb-2">See you soon!</div>
+              <div className="text-sm text-gray-600">Are you sure you want to logout?</div>
+            </div>
+          }
+          onConfirm={() => { logout(); setShowLogoutConfirm(false); }}
+          onCancel={() => setShowLogoutConfirm(false)}
+          confirmText="Yes, logout"
+          cancelText="Cancel"
+        />
+      )}
     </div>
   );
 }

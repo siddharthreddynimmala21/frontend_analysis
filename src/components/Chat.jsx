@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import ChatMessage from './chat/ChatMessage';
 import ChatInput from './chat/ChatInput';
 import { 
@@ -13,7 +14,7 @@ import {
   getChatSessions,
   deleteChatHistory
 } from '../services/api';
-import Navigation from './common/Navigation';
+// Navigation removed for Chat page per new layout
 import { Upload, FileText, Trash2, AlertCircle, ChevronDown, Plus, MessageSquare, Menu, X } from 'lucide-react';
 import ConfirmationDialog from './common/ConfirmationDialog';
 
@@ -74,7 +75,8 @@ function CustomDropdown({ value, onChange, disabled, options }) {
 }
 
 export default function Chat() {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout, isAdmin } = useAuth();
   const [messages, setMessages] = useState([]);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,6 +91,9 @@ export default function Chat() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmDialogMessage, setConfirmDialogMessage] = useState('');
   const [confirmDialogAction, setConfirmDialogAction] = useState(() => () => {});
+  const [showProfileInfo, setShowProfileInfo] = useState(false);
+  // Logout confirmation
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Load resumes and chat sessions on component mount
   useEffect(() => {
@@ -817,9 +822,57 @@ export default function Chat() {
   const isResumeDeleted = currentSession && !currentResume && currentSession.resumeId;
 
   return (
-    <div className="flex h-screen bg-white text-gray-900 relative">
-      {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 w-64 bg-white p-4 border-r border-gray-200 transform ${sidebarOpen ? 'translate-x-0 z-50' : '-translate-x-full z-40'} lg:relative lg:translate-x-0 lg:w-1/4 transition-transform duration-300 ease-in-out`}>
+    <div className="flex min-h-screen bg-white text-gray-900">
+      {/* Section 1: App Sidebar (Dashboard style, fixed) */}
+      <aside className="fixed inset-y-0 left-0 w-60 border-r border-gray-200 p-4 hidden sm:flex flex-col bg-white">
+        <button
+          type="button"
+          aria-label="Go to Dashboard"
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+        >
+          <div className="w-8 h-8 flex items-center justify-center">
+            <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-8 h-8 object-contain rounded" />
+          </div>
+          <div className="text-xl font-semibold">Resume Refiner</div>
+        </button>
+        <nav className="space-y-1">
+          <button
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+            onClick={() => navigate('/dashboard')}
+          >
+            Dashboard
+          </button>
+          {isAdmin && (
+            <button
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+              onClick={() => navigate('/admin')}
+            >
+              Admin
+            </button>
+          )}
+          {!isAdmin && (
+            <button
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+              onClick={() => setShowProfileInfo(true)}
+            >
+              My Profile
+            </button>
+          )}
+          <button
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+            onClick={() => setShowLogoutConfirm(true)}
+          >
+            Logout
+          </button>
+        </nav>
+      </aside>
+
+      {/* Content wrapper shifted to accommodate fixed sidebar */}
+      <div className="flex flex-1 w-full ml-0 sm:ml-60 min-h-screen">
+
+      {/* Section 2: Chats panel (collapsible) */}
+      <div className={`${sidebarOpen ? 'block' : 'hidden lg:block'} w-72 bg-white p-4 border-r border-gray-200 transition-all duration-300 ease-in-out`}>
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
           <div className="p-4 border-b border-gray-200">
@@ -827,7 +880,7 @@ export default function Chat() {
               <h2 className="text-lg font-semibold">Chats</h2>
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="lg:hidden p-1 hover:bg-gray-100 rounded absolute top-4 right-4"
+                className="lg:hidden p-1 hover:bg-gray-100 rounded"
               >
                 <X className="w-5 h-5 text-gray-600" />
               </button>
@@ -958,36 +1011,15 @@ export default function Chat() {
                   </button>
                 </div>
               ))}
-
             </div>
           </div>
         </div>
 
-        {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col pt-16 sm:pt-20 lg:ml-1/4 relative">
-        {/* Overlay for mobile when sidebar is open */}
-        {sidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black/30 z-40 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          ></div>
-        )}
-        {/* Navigation Bar */}
-        <Navigation setSidebarOpen={setSidebarOpen} />
-        
-        {/* Mobile Sidebar Toggle */}
-        {/* <div className="lg:hidden p-2">
-          <button
-              onClick={() => setSidebarOpen(true)}
-              className="flex items-center space-x-1 p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-        </div> */}
-        
-        <div className="flex-1 flex flex-col px-2 sm:px-4 md:mt-8">
+      {/* Section 3: Main Chat Area */}
+      <div className="flex-1 flex flex-col relative min-h-screen">
+        <div className="flex-1 flex flex-col px-2 sm:px-4">
           <motion.div 
-            className="w-[95vw] max-w-5xl mx-auto flex flex-col bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200 h-[calc(100vh-5rem)] lg:h-[calc(100vh-8rem)]"
+            className="w-full max-w-none mx-auto my-3 flex flex-col bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200 h-[calc(100vh-1.5rem)]"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
@@ -1130,16 +1162,10 @@ export default function Chat() {
           </motion.div>
         </div>
       </div>
-      
-      {/* Sidebar Overlay for Mobile */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
 
-      {/* Render ConfirmationDialog */}
+      </div>
+
+      {/* Render ConfirmationDialog - Delete chat/resume */}
       {showConfirmDialog && (
         <ConfirmationDialog
           message={confirmDialogMessage}
@@ -1147,6 +1173,37 @@ export default function Chat() {
           onCancel={() => setShowConfirmDialog(false)}
           confirmText="Delete"
           cancelText="Cancel"
+        />
+      )}
+
+      {/* Logout confirmation */}
+      {showLogoutConfirm && (
+        <ConfirmationDialog
+          message={
+            <div className="text-center">
+              <div className="text-xl font-semibold text-gray-800 mb-2">See you soon!</div>
+              <div className="text-sm text-gray-600">Are you sure you want to logout?</div>
+            </div>
+          }
+          onConfirm={() => { logout(); setShowLogoutConfirm(false); }}
+          onCancel={() => setShowLogoutConfirm(false)}
+          confirmText="Yes, logout"
+          cancelText="Cancel"
+        />
+      )}
+
+      {/* Simple My Profile dialog (match Dashboard style) */}
+      {showProfileInfo && (
+        <ConfirmationDialog
+          message={
+            <div className="text-center">
+              <div className="text-base text-gray-700">Profile feature is coming soon.</div>
+            </div>
+          }
+          onConfirm={() => setShowProfileInfo(false)}
+          onCancel={() => setShowProfileInfo(false)}
+          confirmText="OK"
+          cancelText="Close"
         />
       )}
     </div>

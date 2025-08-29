@@ -46,7 +46,7 @@ export default function Navigation({ showBack = false, setSidebarOpen }) {
             className="flex items-center space-x-2 sm:space-x-3 cursor-pointer select-none"
           >
             <div className="w-8 h-8 sm:w-12 sm:h-12 flex items-center justify-center">
-              <img src="/assets/Resume_Refiner.png" alt="ResumeRefiner Logo" className="w-full h-full object-contain rounded-lg" />
+              <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-full h-full object-contain rounded-lg" />
             </div>
             <span className="text-lg sm:text-2xl font-semibold tracking-tight">ResumeRefiner Pro+</span>
           </div>

@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, Upload, Wand2, Brain } from 'lucide-react';
-import Navigation from './common/Navigation';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../services/api';
+import ConfirmationDialog from './common/ConfirmationDialog';
 
 export default function AIInterview() {
+  const navigate = useNavigate();
+  const { user, logout, isAdmin } = useAuth();
   const [currentRole, setCurrentRole] = useState('');
   const [targetRole, setTargetRole] = useState('');
   const [experience, setExperience] = useState('');
@@ -38,6 +42,10 @@ export default function AIInterview() {
   const [disabledQuestions, setDisabledQuestions] = useState(new Set()); // set of flat index numbers that are expired/locked
   const autoAdvanceRef = useRef(false);
   const [questionTimers, setQuestionTimers] = useState({}); // key: flat index -> seconds remaining
+  // Auto-focus ref for descriptive answer textarea
+  const descTextareaRef = useRef(null);
+  // Sidebar logout confirmation (only for setup/details view)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Session ID Management:
   // - Round 1: Generate new session ID (backend creates new interview)
@@ -321,6 +329,25 @@ export default function AIInterview() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuestionIndex, inExamMode, flatQuestions.length]);
+
+  // Auto-focus the textarea when the current question is a descriptive one
+  useEffect(() => {
+    if (!inExamMode) return;
+    const q = flatQuestions[currentQuestionIndex];
+    if (!q || q.type !== 'desc') return;
+    // Wait for render flush
+    const id = setTimeout(() => {
+      if (descTextareaRef.current) {
+        try {
+          descTextareaRef.current.focus();
+          const val = descTextareaRef.current.value || '';
+          // Place cursor at the end for convenience
+          descTextareaRef.current.setSelectionRange(val.length, val.length);
+        } catch (_) { /* noop */ }
+      }
+    }, 0);
+    return () => clearTimeout(id);
+  }, [currentQuestionIndex, inExamMode, flatQuestions]);
 
   // Helper to navigate while persisting current question's timer
   const navigateToIndex = (nextIndex) => {
@@ -785,49 +812,97 @@ export default function AIInterview() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 to-black text-white p-4">
-      <Navigation showBack={true} />
+    <div className="flex min-h-screen bg-white text-gray-900">
+      {/* Sidebar: only show on details input page (not in exam mode) */}
+      {!inExamMode && (
+        <aside className="fixed inset-y-0 left-0 w-60 border-r border-gray-200 p-4 hidden sm:flex flex-col bg-white">
+          <button
+            type="button"
+            aria-label="Go to Dashboard"
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+          >
+            <div className="w-8 h-8 flex items-center justify-center">
+              <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-8 h-8 object-contain rounded" />
+            </div>
+            <div className="text-xl font-semibold">Resume Refiner</div>
+          </button>
+          <nav className="space-y-1">
+            <button
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+              onClick={() => navigate('/dashboard')}
+            >
+              Dashboard
+            </button>
+            {isAdmin && (
+              <button
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                onClick={() => navigate('/admin')}
+              >
+                Admin
+              </button>
+            )}
+            {!isAdmin && (
+              <button
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                onClick={() => alert('Profile feature is coming soon.')}
+              >
+                My Profile
+              </button>
+            )}
+            <button
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+              onClick={() => setShowLogoutConfirm(true)}
+            >
+              Logout
+            </button>
+          </nav>
+        </aside>
+      )}
+
+      {/* Content wrapper; shift when sidebar is visible */}
+      <div className={`flex flex-1 w-full min-h-screen px-4 py-6 overflow-x-hidden overflow-y-auto ${!inExamMode ? 'ml-0 sm:ml-60' : ''}`}>
 
       {/* Loading Overlay */}
       {isLoading && (
-        <motion.div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4"
+        <motion.div 
+          className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
         >
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
             <div className="flex justify-center mb-6">
-              <svg className="animate-spin h-12 w-12 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-12 w-12 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </div>
-            <h3 className="text-xl font-bold mb-4">Starting Interview Practice</h3>
-            <p className="text-gray-300 mb-6">Generating personalized questions based on your resume and job description.</p>
-            <p className="text-gray-300 font-medium">This may take a few moments...</p>
+            <h3 className="text-xl font-bold mb-4 text-gray-900">Starting Interview Practice</h3>
+            <p className="text-gray-600 mb-6">Generating personalized questions based on your resume and job description.</p>
+            <p className="text-gray-700 font-medium">This may take a few moments...</p>
           </div>
         </motion.div>
       )}
 
-      <motion.div
-        className="flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto mt-6 sm:mt-16"
+      <motion.div 
+        className="flex-1 flex flex-col justify-start relative w-full max-w-4xl mx-auto my-0"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
 
         <motion.div
-          className="w-full bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-6 md:p-8 mt-12"
+          className="w-full bg-white border border-gray-200 rounded-2xl shadow-lg p-4 md:p-6 flex flex-col h-auto"
           variants={cardVariants}
         >
           <div className="mb-6 flex items-center">
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center mr-4">
+            <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center mr-4">
               <Brain className="w-6 h-6 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-bold">AI Interview Practice</h2>
-              <p className="text-sm text-gray-400">{getRoundName(currentRound)}</p>
+              <p className="text-sm text-gray-500">{getRoundName(currentRound)}</p>
               {sessionId && (
                 <p className="text-xs text-gray-500 mt-1">Session: {sessionId.slice(-8)}</p>
               )}
@@ -837,8 +912,8 @@ export default function AIInterview() {
                     <span
                       key={idx}
                       className={`px-2 py-1 text-xs rounded-full ${round.validation.verdict === 'Pass'
-                        ? 'bg-green-500/20 text-green-300'
-                        : 'bg-red-500/20 text-red-300'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
                         }`}
                     >
                       {getRoundName(round.round)}: {round.validation.verdict}
@@ -850,7 +925,7 @@ export default function AIInterview() {
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200">
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
               {error}
             </div>
           )}
@@ -859,9 +934,9 @@ export default function AIInterview() {
           {!inExamMode && (
             <>
               {/* Round-specific instructions */}
-              <div className="mb-6 p-4 bg-blue-500/20 border border-blue-500/50 rounded-lg">
+              <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                 <h3 className="font-medium mb-2">Round Information:</h3>
-                <p className="text-sm text-blue-200">
+                <p className="text-sm text-gray-700">
                   {currentRound === 1 && "This round focuses on fundamental technical skills and basic concepts. You need 60% to pass."}
                   {currentRound === 2 && "This round covers advanced technical skills, system design, and architecture. You need 60% to pass."}
                   {currentRound === 3 && "This round evaluates your leadership, management, and team handling skills. Any score allows progression to HR round."}
@@ -875,13 +950,13 @@ export default function AIInterview() {
                   Upload Resume (PDF)
                 </label>
                 <div className="flex items-center justify-center w-full">
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white/5 border-white/20 hover:bg-white/10">
+                  <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 border-gray-300 hover:bg-gray-100">
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-3 text-gray-400" />
-                      <p className="mb-2 text-sm text-gray-400">
+                      <Upload className="w-8 h-8 mb-3 text-gray-500" />
+                      <p className="mb-2 text-sm text-gray-600">
                         <span className="font-semibold">Click to upload</span> or drag and drop
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-gray-500">
                         PDF files only (MAX. 10MB)
                       </p>
                     </div>
@@ -896,14 +971,14 @@ export default function AIInterview() {
                   </label>
                 </div>
                 {selectedFile && (
-                  <div className="mt-2 flex items-center text-sm text-blue-300">
-                    <FileText className="w-4 h-4 mr-2" />
+                  <div className="mt-2 flex items-center text-sm text-blue-700">
+                    <FileText className="w-4 h-4 mr-2 text-blue-700" />
                     {selectedFile.name}
                   </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div>
                   <label className="block text-sm font-medium mb-2" htmlFor="currentRole">
                     Current Role
@@ -911,14 +986,13 @@ export default function AIInterview() {
                   <input
                     id="currentRole"
                     type="text"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                    className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
                     placeholder="e.g., Software Engineer"
                     value={currentRole}
                     onChange={(e) => setCurrentRole(e.target.value)}
                     disabled={isLoading}
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-2" htmlFor="targetRole">
                     Target Role
@@ -926,30 +1000,29 @@ export default function AIInterview() {
                   <input
                     id="targetRole"
                     type="text"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                    className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
                     placeholder="e.g., Senior Software Engineer"
                     value={targetRole}
                     onChange={(e) => setTargetRole(e.target.value)}
                     disabled={isLoading}
                   />
                 </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2" htmlFor="experience">
-                  Years of Experience
-                </label>
-                <input
-                  id="experience"
-                  type="number"
-                  min="0"
-                  step="1"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
-                  placeholder="e.g., 3"
-                  value={experience}
-                  onChange={(e) => setExperience(e.target.value)}
-                  disabled={isLoading}
-                />
+                <div>
+                  <label className="block text-sm font-medium mb-2" htmlFor="experience">
+                    Years of Experience
+                  </label>
+                  <input
+                    id="experience"
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
+                    placeholder="e.g., 3"
+                    value={experience}
+                    onChange={(e) => setExperience(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
 
               <div className="mb-6">
@@ -961,7 +1034,7 @@ export default function AIInterview() {
                   <label className="inline-flex items-center">
                     <input
                       type="radio"
-                      className="form-radio h-4 w-4 text-purple-600"
+                      className="form-radio h-4 w-4 text-gray-900 accent-gray-900"
                       name="jobDescriptionOption"
                       value="paste"
                       checked={jobDescriptionOption === 'paste'}
@@ -974,7 +1047,7 @@ export default function AIInterview() {
                   <label className="inline-flex items-center">
                     <input
                       type="radio"
-                      className="form-radio h-4 w-4 text-purple-600"
+                      className="form-radio h-4 w-4 text-gray-900 accent-gray-900"
                       name="jobDescriptionOption"
                       value="generate"
                       checked={jobDescriptionOption === 'generate'}
@@ -988,20 +1061,20 @@ export default function AIInterview() {
                 {jobDescriptionOption === 'paste' ? (
                   <textarea
                     id="jobDescription"
-                    rows="5"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                    rows="4"
+                    className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
                     placeholder="Paste the job description here..."
                     value={jobDescription}
                     onChange={(e) => setJobDescription(e.target.value)}
                     disabled={isLoading}
                   ></textarea>
                 ) : (
-                  <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex items-center">
-                    <Wand2 className="w-5 h-5 text-purple-400 mr-3" />
-                    <p className="text-sm text-gray-300">
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg flex items-center">
+                    <Wand2 className="w-5 h-5 text-gray-700 mr-3" />
+                    <p className="text-sm text-gray-700">
                       We'll generate a job description based on your target role and experience.
                       <br />
-                      <span className="text-xs text-gray-400 mt-1 block">
+                      <span className="text-xs text-gray-500 mt-1 block">
                         This will be used for generating interview questions.
                       </span>
                     </p>
@@ -1009,22 +1082,24 @@ export default function AIInterview() {
                 )}
               </div>
 
-              {error && <div className="mb-4 text-red-400 text-sm">{error}</div>}
-              <button
-                type="submit"
-                className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 ${isLoading ? 'bg-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'}`}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Starting Practice...
-                  </span>
-                ) : 'Start Interview Practice'}
-              </button>
+              {/* Submit area */}
+              <div className="mt-4 pt-4 border-t">
+                <button
+                  type="submit"
+                  className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 ${isLoading ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-900'}`}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Starting Practice...
+                    </span>
+                  ) : 'Start Interview Practice'}
+                </button>
+              </div>
             </form>
             </>
           )}
@@ -1032,19 +1107,19 @@ export default function AIInterview() {
           {/* Exam Mode */}
           {inExamMode && result?.questions && (
             <motion.div
-              className="mt-8 p-6 bg-white/5 border border-white/20 rounded-xl"
+              className="mt-8 p-6 bg-gray-50 border border-gray-200 rounded-xl"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">{getRoundName(result.round)} Questions</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{getRoundName(result.round)} Questions</h3>
                 <div className="flex items-center gap-4">
-                  <div className="text-sm text-gray-300">
+                  <div className="text-sm text-gray-600">
                     Question {flatQuestions.length ? (currentQuestionIndex + 1) : 0} of {flatQuestions.length}
                   </div>
                   <div
-                    className={`px-3 py-1 rounded-md text-sm font-mono ${(timeLeft !== null && timeLeft <= 10 && timeLeft > 0) ? 'bg-red-600/30 text-red-200' : 'bg-indigo-600/30 text-indigo-100'}`}
+                    className={`px-3 py-1 rounded-md text-sm font-mono ${(timeLeft !== null && timeLeft <= 10 && timeLeft > 0) ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-800'}`}
                     title="Time remaining for this question"
                   >
                     {formatTime(timeLeft)}
@@ -1058,7 +1133,14 @@ export default function AIInterview() {
                       <p className="font-semibold mb-3">{flatQuestions[currentQuestionIndex].q.question}</p>
                       <div className="space-y-2">
                         {flatQuestions[currentQuestionIndex].q.options.map((opt, i) => (
-                          <label key={i} className="flex items-center p-2 rounded hover:bg-white/5 cursor-pointer">
+                          <label
+                            key={i}
+                            className={`flex items-center p-3 rounded-lg cursor-pointer border transition-all duration-200 shadow-sm hover:shadow ${
+                              answers.mcq[flatQuestions[currentQuestionIndex].idx] === opt
+                                ? 'bg-gray-100 border-gray-900 ring-1 ring-gray-900'
+                                : 'bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                            }`}
+                          >
                             <input
                               type="radio"
                               name={`mcq-${flatQuestions[currentQuestionIndex].idx}`}
@@ -1070,10 +1152,10 @@ export default function AIInterview() {
                                   mcq: { ...prev.mcq, [flatQuestions[currentQuestionIndex].idx]: opt },
                                 }))
                               }
-                              className="mr-2"
+                              className="mr-3 accent-gray-900"
                               disabled={timeLeft === 0 || answersSubmitted || isValidating || Boolean(validation)}
                             />
-                            {opt}
+                            <span className="select-none">{opt}</span>
                           </label>
                         ))}
                       </div>
@@ -1082,7 +1164,8 @@ export default function AIInterview() {
                     <div>
                       <p className="font-semibold mb-3">{flatQuestions[currentQuestionIndex].q}</p>
                       <textarea
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3"
+                        ref={descTextareaRef}
+                        className="w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900"
                         rows={5}
                         value={answers.desc[flatQuestions[currentQuestionIndex].idx] || ''}
                         onChange={(e) =>
@@ -1101,7 +1184,7 @@ export default function AIInterview() {
               <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
                 {currentQuestionIndex < flatQuestions.length - 1 ? (
                   <button
-                    className="py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 disabled:opacity-60"
+                    className="py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-black text-white hover:bg-gray-900 disabled:opacity-60"
                     onClick={() => navigateToIndex(Math.min(flatQuestions.length - 1, currentQuestionIndex + 1))}
                     disabled={(() => {
                       const cq = flatQuestions[currentQuestionIndex];
@@ -1117,7 +1200,7 @@ export default function AIInterview() {
                   </button>
                 ) : (
                   <button
-                    className="py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:opacity-60 flex items-center justify-center"
+                    className="py-3 px-4 rounded-lg font-medium transition-all duration-200 bg-black text-white hover:bg-gray-900 disabled:opacity-60 flex items-center justify-center"
                     disabled={(() => {
                       if (isLoading || !result?.sessionId || answersSubmitted || isValidating) return true;
                       const cq = flatQuestions[currentQuestionIndex];
@@ -1147,13 +1230,13 @@ export default function AIInterview() {
 
           {validation && (
             <motion.div
-              className="mt-8 p-6 bg-gray-800 rounded-lg"
+              className="mt-8 p-6 bg-white border border-gray-200 rounded-lg text-gray-900"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
               <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <Brain className="w-6 h-6 mr-2 text-purple-400" />
+                <Brain className="w-6 h-6 mr-2 text-gray-900" />
                 Interview Results
               </h2>
 
@@ -1171,7 +1254,7 @@ export default function AIInterview() {
                   <span>Overall Score</span>
                   <span className="font-semibold">{validation.percentage || 0}%</span>
                 </div>
-                <div className="mt-2 bg-gray-700 rounded-full h-3">
+                <div className="mt-2 bg-gray-200 rounded-full h-3">
                   <div
                     className="h-3 rounded-full transition-all duration-500"
                     style={{
@@ -1184,34 +1267,34 @@ export default function AIInterview() {
 
               {/* Quick Stats */}
               <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-gray-700 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-blue-400">{validation.mcq?.score || 0}/{validation.mcq?.max_score || 0}</div>
-                  <div className="text-sm text-gray-300">MCQ Questions</div>
+                <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-blue-700">{validation.mcq?.score || 0}/{validation.mcq?.max_score || 0}</div>
+                  <div className="text-sm text-gray-600">MCQ Questions</div>
                 </div>
-                <div className="bg-gray-700 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-green-400">{validation.descriptive?.score || 0}/{validation.descriptive?.max_score || 0}</div>
-                  <div className="text-sm text-gray-300">Descriptive Questions</div>
+                <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-700">{validation.descriptive?.score || 0}/{validation.descriptive?.max_score || 0}</div>
+                  <div className="text-sm text-gray-600">Descriptive Questions</div>
                 </div>
               </div>
 
               {/* Progression Info */}
               {currentRound < 4 && (
-                <div className="mb-6 p-4 bg-gray-700 rounded-lg">
-                  <h4 className="font-medium mb-2">Next Round Requirements:</h4>
-                  <p className="text-sm text-gray-300">
+                <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <h4 className="font-medium mb-2 text-gray-900">Next Round Requirements:</h4>
+                  <p className="text-sm text-gray-700">
                     {currentRound === 1 && "To proceed to Technical Round 2, you need to Pass (≥60% score)"}
                     {currentRound === 2 && "To proceed to Managerial Round, you need to Pass (≥60% score)"}
                     {currentRound === 3 && "You can proceed to HR Round regardless of score"}
                   </p>
                   {canProceedToNextRound() ? (
-                    <div className="mt-2 flex items-center text-green-400">
+                    <div className="mt-2 flex items-center text-green-700">
                       <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       Eligible for next round
                     </div>
                   ) : (
-                    <div className="mt-2 flex items-center text-red-400">
+                    <div className="mt-2 flex items-center text-red-600">
                       <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                       </svg>
@@ -1225,7 +1308,7 @@ export default function AIInterview() {
               <div className="text-center space-y-4">
                 <button
                   onClick={() => setShowFullReport(!showFullReport)}
-                  className="py-3 px-6 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 rounded-lg font-medium transition-all duration-200 flex items-center mx-auto"
+                  className="py-3 px-6 bg-black text-white hover:bg-gray-900 rounded-lg font-medium transition-all duration-200 flex items-center mx-auto"
                 >
                   {showFullReport ? 'Hide Detailed Report' : 'View Detailed Report'}
                   <svg
@@ -1243,7 +1326,7 @@ export default function AIInterview() {
                   <button
                     onClick={startNextRound}
                     disabled={isLoading}
-                    className="py-3 px-6 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-lg font-medium transition-all duration-200 flex items-center mx-auto disabled:opacity-60"
+                    className="py-3 px-6 bg-black text-white hover:bg-gray-900 rounded-lg font-medium transition-all duration-200 flex items-center mx-auto disabled:opacity-60"
                   >
                     {isLoading ? (
                       <>
@@ -1266,7 +1349,7 @@ export default function AIInterview() {
 
                 {/* Final Round Completion Message */}
                 {currentRound === 4 && (
-                  <div className="py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg text-center">
+                  <div className="py-4 px-6 bg-gray-900 text-white rounded-lg text-center">
                     <div className="flex items-center justify-center mb-2">
                       <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -1296,7 +1379,7 @@ export default function AIInterview() {
                       toast.success('Ready to start a new interview!');
                     }}
                     disabled={isLoading}
-                    className="py-3 px-6 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 rounded-lg font-medium transition-all duration-200 flex items-center mx-auto disabled:opacity-60 mt-4"
+                    className="py-3 px-6 bg-black text-white hover:bg-gray-900 rounded-lg font-medium transition-all duration-200 flex items-center mx-auto disabled:opacity-60 mt-4"
                   >
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1359,26 +1442,44 @@ export default function AIInterview() {
                       {validation.descriptive?.details?.map((item, idx) => (
                         <li key={idx} className="p-4 rounded-lg" style={{ backgroundColor: item.score === 3 ? 'rgba(34, 197, 94, 0.1)' : item.score > 0 ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)' }}>
                           <p className="font-semibold mb-2">{item.question}</p>
-                          <div className="mb-3 p-3 bg-gray-700 rounded whitespace-pre-wrap">
-                            {item.user_answer || <em className="text-gray-400">No answer provided</em>}
+                          <div className="mb-3 p-3 bg-gray-50 border border-gray-200 text-gray-800 rounded whitespace-pre-wrap">
+                            {item.user_answer || <em className="text-gray-500">No answer provided</em>}
                           </div>
                           <div className="flex justify-between items-center mb-2">
                             <span className="font-medium">Score: {item.score}/{item.max_score}</span>
                           </div>
-                          <div className="p-3 bg-gray-700 rounded">
+                          <div className="p-3 bg-gray-50 border border-gray-200 text-gray-800 rounded">
                             <p className="font-medium mb-1">Feedback:</p>
                             <p>{item.feedback}</p>
                           </div>
                         </li>
                       ))}
                     </ul>
-                  </div>
+              
+    </div>
                 </motion.div>
               )}
             </motion.div>
           )}
         </motion.div>
       </motion.div>
+
+      {/* Logout Confirmation Dialog (setup/details view) */}
+      {showLogoutConfirm && (
+        <ConfirmationDialog
+          message={
+            <div className="text-center">
+              <div className="text-xl font-semibold text-gray-800 mb-2">See you soon!</div>
+              <div className="text-sm text-gray-600">Are you sure you want to logout?</div>
+            </div>
+          }
+          onConfirm={() => { logout(); setShowLogoutConfirm(false); }}
+          onCancel={() => setShowLogoutConfirm(false)}
+          confirmText="Yes, logout"
+          cancelText="Cancel"
+        />
+      )}
+      </div>
     </div>
   );
 }

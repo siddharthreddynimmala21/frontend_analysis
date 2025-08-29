@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, MessageSquare, FileText, Wand2, Upload } from 'lucide-react';
+import { MessageSquare, FileText, Wand2, Upload } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ConfirmationDialog from './common/ConfirmationDialog';
 
@@ -58,12 +58,17 @@ export default function Dashboard() {
       <div className="flex">
         {/* Sidebar */}
         <aside className="w-60 border-r border-gray-200 min-h-screen p-4">
-          <div className="flex items-center gap-2 px-2 mb-6">
-            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-gray-700" />
+          <button
+            type="button"
+            aria-label="Go to Dashboard"
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+          >
+            <div className="w-8 h-8 flex items-center justify-center">
+              <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-8 h-8 object-contain rounded" />
             </div>
             <div className="text-xl font-semibold">Resume Refiner</div>
-          </div>
+          </button>
           <nav className="space-y-1">
             <button
               className="w-full text-left px-3 py-2 rounded-md bg-gray-100 text-gray-900 font-medium"
