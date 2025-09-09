@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, FileText, Wand2, Upload } from 'lucide-react';
+import { MessageSquare, FileText, Wand2, Upload, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ConfirmationDialog from './common/ConfirmationDialog';
 
@@ -10,6 +10,29 @@ export default function Dashboard() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [showProfileInfo, setShowProfileInfo] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+
+  // Close mobile drawer on resize to desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) setNavOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Manage body scroll and ESC close while drawer is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    if (navOpen) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    const onKeyDown = (e) => { if (e.key === 'Escape') setNavOpen(false); };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = originalOverflow || '';
+    };
+  }, [navOpen]);
 
   const handleLogout = () => setShowLogoutConfirm(true);
   const confirmLogout = () => { logout(); setShowLogoutConfirm(false); };
@@ -54,10 +77,10 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden">
       <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-60 border-r border-gray-200 min-h-screen p-4">
+        {/* Sidebar (desktop) */}
+        <aside className="hidden md:block w-60 border-r border-gray-200 min-h-screen p-4">
           <button
             type="button"
             aria-label="Go to Dashboard"
@@ -101,13 +124,103 @@ export default function Dashboard() {
           </nav>
         </aside>
 
+        {/* Mobile sidebar drawer */}
+        {navOpen && (
+          <div className="fixed inset-0 z-40 md:hidden">
+            <div className="absolute inset-0 bg-black/30" onClick={() => setNavOpen(false)} />
+            <aside className="absolute left-0 top-0 h-full w-60 bg-white border-r border-gray-200 p-4 shadow-xl">
+              <button
+                type="button"
+                aria-label="Close menu"
+                className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+                onClick={() => setNavOpen(false)}
+              >
+                <X className="w-5 h-5" />
+                <span className="text-sm">Close</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Go to Dashboard"
+                onClick={() => { setNavOpen(false); navigate('/dashboard'); }}
+                className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+              >
+                <div className="w-8 h-8 flex items-center justify-center">
+                  <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-8 h-8 object-contain rounded" />
+                </div>
+                <div className="text-xl font-semibold">Resume Refiner</div>
+              </button>
+              <nav className="space-y-1">
+                <button
+                  className="w-full text-left px-3 py-2 rounded-md bg-gray-100 text-gray-900 font-medium"
+                  onClick={() => { setNavOpen(false); navigate('/dashboard'); }}
+                >
+                  Dashboard
+                </button>
+                {isAdmin && (
+                  <button
+                    className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                    onClick={() => { setNavOpen(false); navigate('/admin'); }}
+                  >
+                    Admin
+                  </button>
+                )}
+                {!isAdmin && (
+                  <button
+                    className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                    onClick={() => { setNavOpen(false); setShowProfileInfo(true); }}
+                  >
+                    My Profile
+                  </button>
+                )}
+                <button
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                  onClick={() => { setNavOpen(false); handleLogout(); }}
+                >
+                  Logout
+                </button>
+              </nav>
+            </aside>
+          </div>
+        )}
+
         {/* Main content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-6 overflow-x-hidden">
           {/* Top bar */}
           <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="text-sm text-gray-500">Welcome back,</div>
-              <div className="text-xl font-semibold text-gray-900">{displayName ? `${displayName}!` : 'User!'}</div>
+            <div className="flex items-center gap-3">
+              {/* Mobile hamburger */}
+              <button
+                type="button"
+                className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-md border border-gray-300 text-gray-800"
+                aria-label={navOpen ? 'Close menu' : 'Open menu'}
+                onClick={() => setNavOpen(v => !v)}
+              >
+                {navOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </button>
+              {/* Mobile logo (visible when sidebar is hidden) */}
+              <button
+                type="button"
+                className="md:hidden inline-flex items-center justify-center w-10 h-10"
+                aria-label="Go to Dashboard"
+                onClick={() => navigate('/dashboard')}
+              >
+                <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-9 h-9 object-contain rounded shrink-0" />
+              </button>
+              {(() => {
+                const len = (displayName || '').length;
+                let nameSize = 'text-xl';
+                if (len > 28) nameSize = 'text-sm';
+                else if (len > 20) nameSize = 'text-base';
+                else if (len > 12) nameSize = 'text-lg';
+                return (
+                  <div className="min-w-0">
+                    <div className="text-sm text-gray-500">Welcome back,</div>
+                    <div className={`${nameSize} font-semibold text-gray-900 truncate max-w-[70vw] sm:max-w-none`}>
+                      {displayName ? `${displayName}!` : 'User!'}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             {/* <button
               className="inline-flex items-center gap-2 px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md border border-gray-300"
@@ -119,9 +232,9 @@ export default function Dashboard() {
           </div>
 
           {/* Action blocks: 2x2 grid of large cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-5xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-5xl">
             {/* Start Interview */}
-            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5 h-56 flex flex-col justify-between">
+            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5 h-56 flex flex-col justify-between break-words">
               <div>
                 <MessageSquare className="w-5 h-5 text-gray-700 mb-3" />
                 <div className="text-gray-900 font-medium mb-1">AI Interview</div>
@@ -136,7 +249,7 @@ export default function Dashboard() {
             </div>
 
             {/* Open Chat */}
-            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5 h-56 flex flex-col justify-between">
+            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5 h-56 flex flex-col justify-between break-words">
               <div>
                 <FileText className="w-5 h-5 text-gray-700 mb-3" />
                 <div className="text-gray-900 font-medium mb-1">Resume Q&A</div>

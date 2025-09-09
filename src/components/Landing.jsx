@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageSquare, FileText, Wand2, Upload } from 'lucide-react';
+import { MessageSquare, FileText, Wand2, Upload, Menu, X } from 'lucide-react';
 import '../styles/landing.css';
 
 export default function Landing() {
   const fullTitle = 'Land Your Dream Job with AI- Powered Interview and Resume Tools.';
   const [typed, setTyped] = useState('');
+  const [isNavOpen, setIsNavOpen] = useState(false);
 
   useEffect(() => {
     let i = 0;
@@ -26,7 +27,16 @@ export default function Landing() {
             <img src="/new_logo.png" alt="ResumeRefiner Logo" className="brand-logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
             <span className="brand-text">ResumeRefiner</span>
           </div>
-          <nav className="nav-links">
+          {/* Mobile nav toggle (hidden on desktop) */}
+          <button
+            className="nav-toggle"
+            aria-label={isNavOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={isNavOpen}
+            onClick={() => setIsNavOpen(o => !o)}
+          >
+            {isNavOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <nav className={`nav-links ${isNavOpen ? 'open' : ''}`} onClick={() => setIsNavOpen(false)}>
             <a
               href="#features"
               className="nav-link"

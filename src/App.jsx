@@ -24,6 +24,8 @@ function App() {
       <AuthProvider>
         <Toaster position="top-right" />
         <Routes>
+          {/* Redirect common typo to the correct dashboard route */}
+          <Route path="/dasboard" element={<Navigate to="/dashboard" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />

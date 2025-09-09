@@ -99,7 +99,7 @@ export default function Register() {
           {/* Email + Verify */}
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm text-gray-700">Email</label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-col sm:flex-row">
               <input
                 id="email"
                 type="email"
@@ -112,7 +112,7 @@ export default function Register() {
                 type="button"
                 onClick={handleVerifyEmail}
                 disabled={sendingOtp}
-                className="px-3 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60"
+                className="px-3 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60 sm:w-auto w-full"
               >
                 {sendingOtp ? 'Verifying…' : (emailVerified ? 'Verified' : 'Verify')}
               </button>
@@ -122,8 +122,8 @@ export default function Register() {
           {/* OTP + Verify */}
           <div className="space-y-2 opacity-100">
             <label htmlFor="otp" className="text-sm text-gray-700">OTP</label>
-            <div className="flex items-center gap-2">
-              <div className="flex gap-2" onPaste={(e) => {
+            <div className="flex items-center gap-2 flex-col sm:flex-row">
+              <div className="flex gap-2 flex-wrap" onPaste={(e) => {
                 if (!emailVerified) return;
                 const text = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0,6);
                 if (!text) return;
@@ -175,7 +175,7 @@ export default function Register() {
                 type="button"
                 onClick={handleVerifyOtp}
                 disabled={!emailVerified || verifyingOtp}
-                className="px-3 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60"
+                className="px-3 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60 sm:w-auto w-full"
               >
                 {verifyingOtp ? 'Checking…' : (otpVerified ? 'Verified' : 'Verify')}
               </button>
@@ -219,7 +219,7 @@ export default function Register() {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-sm gap-3 flex-col sm:flex-row">
             <div className="text-gray-600">
               Already have an account?{' '}
               <Link to="/login" className="font-medium text-gray-900 hover:underline">Login</Link>
@@ -228,7 +228,7 @@ export default function Register() {
               type="button"
               onClick={handleCreateAccount}
               disabled={!otpVerified || creating}
-              className="px-4 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60"
+              className="px-4 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60 sm:w-auto w-full"
             >
               {creating ? 'Creating…' : 'Create Account'}
             </button>

@@ -117,10 +117,10 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
               <button
                 type="button"
-                className="text-gray-600 hover:text-gray-800"
+                className="text-gray-600 hover:text-gray-800 w-full sm:w-auto text-center"
                 tabIndex={-1}
                 onClick={() => navigate('/forgot-password')}
               >
@@ -128,7 +128,7 @@ export default function Login() {
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60"
+                className="px-4 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60 w-full sm:w-auto"
                 disabled={loading}
               >
                 {loading ? 'Logging in...' : 'Login'}

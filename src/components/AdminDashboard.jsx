@@ -1,8 +1,82 @@
 import { useEffect, useRef, useState } from 'react';
 import ConfirmationDialog from './common/ConfirmationDialog';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../services/api';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
+  ComposedChart,
+} from 'recharts';
+import { RefreshCw, Menu, X } from 'lucide-react';
+
+// Helper: merge interview count series with pass rate by key
+function mergeSeries(interviews, passRate) {
+  const map = new Map();
+  (Array.isArray(interviews) ? interviews : []).forEach((d) => {
+    if (!d || d.key == null) return;
+    map.set(d.key, { key: d.key, interviews: d.value || 0 });
+  });
+  (Array.isArray(passRate) ? passRate : []).forEach((d) => {
+    if (!d || d.key == null) return;
+    const existing = map.get(d.key) || { key: d.key };
+    existing.rate = typeof d.rate === 'number' ? d.rate : 0;
+    existing.total = d.total || 0;
+    existing.passed = d.passed || 0;
+    map.set(d.key, existing);
+  });
+  // Sort by key ascending (keys are date strings like YYYY-MM-DD or ISO week)
+  return Array.from(map.values()).sort((a, b) => String(a.key).localeCompare(String(b.key)));
+}
+
+// Helper: bucket interviews per user into histogram bins
+function bucketInterviews(perUser) {
+  const bins = [
+    { bucket: '0', count: 0 },
+    { bucket: '1', count: 0 },
+    { bucket: '2-3', count: 0 },
+    { bucket: '4-5', count: 0 },
+    { bucket: '6+', count: 0 },
+  ];
+  (Array.isArray(perUser) ? perUser : []).forEach((d) => {
+    const c = Number(d?.count) || 0;
+    if (c <= 0) bins[0].count += 1;
+    else if (c === 1) bins[1].count += 1;
+    else if (c <= 3) bins[2].count += 1;
+    else if (c <= 5) bins[3].count += 1;
+    else bins[4].count += 1;
+  });
+  return bins;
+}
+
+// Helper: bucket MCQ and Descriptive percentage distributions into ranges
+function bucketMcqDesc(values) {
+  const ranges = [
+    { label: '0-20%', from: 0, to: 0.2 },
+    { label: '20-40%', from: 0.2, to: 0.4 },
+    { label: '40-60%', from: 0.4, to: 0.6 },
+    { label: '60-80%', from: 0.6, to: 0.8 },
+    { label: '80-100%', from: 0.8, to: 1.000001 },
+  ];
+  const buckets = ranges.map((r) => ({ bucket: r.label, mcq: 0, desc: 0 }));
+  (Array.isArray(values) ? values : []).forEach((d) => {
+    const mcq = Number(d?.mcqPct) || 0;
+    const desc = Number(d?.descPct) || 0;
+    const iMcq = ranges.findIndex((r) => mcq >= r.from && mcq < r.to);
+    const iDesc = ranges.findIndex((r) => desc >= r.from && desc < r.to);
+    if (iMcq >= 0) buckets[iMcq].mcq += 1;
+    if (iDesc >= 0) buckets[iDesc].desc += 1;
+  });
+  return buckets;
+}
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -11,11 +85,17 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  // Global KPI metrics
+  const [metrics, setMetrics] = useState(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
   const [resumeCount, setResumeCount] = useState(null);
   const [interviewData, setInterviewData] = useState({ totalInterviews: 0, sessions: [] });
   const [interviewCounts, setInterviewCounts] = useState({}); // { [userId]: number }
   const [error, setError] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  // In-page tabs: 'overview' | 'users'
+  const [activeTab, setActiveTab] = useState('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
   // Carousel state
   const [sessionIndex, setSessionIndex] = useState(0); // which interview (session)
   const [roundIndexBySession, setRoundIndexBySession] = useState({}); // { [sessionIdx]: currentRoundIdx }
@@ -26,6 +106,16 @@ export default function AdminDashboard() {
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const suggestTimer = useRef(null);
+  const [navOpen, setNavOpen] = useState(false);
+
+  // Charts state
+  const [tsSignups, setTsSignups] = useState([]); // [{ key, value }]
+  const [tsInterviews, setTsInterviews] = useState([]); // [{ key, value }]
+  const [tsPassRate, setTsPassRate] = useState([]); // [{ key, total, passed, rate }]
+  const [distInterviewsPerUser, setDistInterviewsPerUser] = useState([]); // [{ userId, count }]
+  const [distMcqDesc, setDistMcqDesc] = useState([]); // [{ mcqPct, descPct }]
+  const [distRoundPass, setDistRoundPass] = useState([]); // [{ round, total, passed, failed }]
+  const [chartsLoading, setChartsLoading] = useState(false);
   // Quick-jump inputs for interview/round indices
   const [sessionJump, setSessionJump] = useState('1');
   const [roundJump, setRoundJump] = useState('1');
@@ -79,6 +169,111 @@ export default function AdminDashboard() {
       setError(`Error loading users: ${e?.message || e}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCharts = async () => {
+    setChartsLoading(true);
+    try {
+      const token = user?.token || localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      const now = new Date();
+      const from = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString();
+      const to = now.toISOString();
+      // Parallel fetches
+      const [signupsRes, interviewsRes, distInterviewsRes, distMcqDescRes, distRoundPassRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/admin/metrics/timeseries?metric=signups&granularity=day&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/metrics/timeseries?metric=interviews&granularity=day&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/metrics/distribution?type=interviews_per_user&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/metrics/distribution?type=mcq_desc&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/metrics/distribution?type=round_pass&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers }),
+      ]);
+      const [signupsJson, interviewsJson, distInterviewsJson, distMcqDescJson, distRoundPassJson] = await Promise.all([
+        signupsRes.json(),
+        interviewsRes.json(),
+        distInterviewsRes.json(),
+        distMcqDescRes.json(),
+        distRoundPassRes.json(),
+      ]);
+      try {
+        console.groupCollapsed('[Admin Charts] Primary fetch sizes');
+        console.log('signups.series:', Array.isArray(signupsJson?.series) ? signupsJson.series.length : 0);
+        console.log('interviews.series:', Array.isArray(interviewsJson?.series) ? interviewsJson.series.length : 0);
+        console.log('interviews.passRate:', Array.isArray(interviewsJson?.passRate) ? interviewsJson.passRate.length : 0);
+        console.log('dist.interviews_per_user:', Array.isArray(distInterviewsJson?.perUser) ? distInterviewsJson.perUser.length : 0);
+        console.log('dist.mcq_desc:', Array.isArray(distMcqDescJson?.values) ? distMcqDescJson.values.length : 0);
+        console.log('dist.round_pass:', Array.isArray(distRoundPassJson?.byRound) ? distRoundPassJson.byRound.length : 0);
+        console.groupEnd();
+      } catch {}
+      if (signupsRes.ok) setTsSignups(Array.isArray(signupsJson.series) ? signupsJson.series : []);
+      if (interviewsRes.ok) {
+        setTsInterviews(Array.isArray(interviewsJson.series) ? interviewsJson.series : []);
+        setTsPassRate(Array.isArray(interviewsJson.passRate) ? interviewsJson.passRate : []);
+      }
+      if (distInterviewsRes.ok) setDistInterviewsPerUser(Array.isArray(distInterviewsJson.perUser) ? distInterviewsJson.perUser : []);
+      if (distMcqDescRes.ok) setDistMcqDesc(Array.isArray(distMcqDescJson.values) ? distMcqDescJson.values : []);
+      if (distRoundPassRes.ok) setDistRoundPass(Array.isArray(distRoundPassJson.byRound) ? distRoundPassJson.byRound : []);
+
+      // If everything is empty, retry without from/to to show any data available
+      const allEmpty = (!signupsJson?.series?.length)
+        && (!interviewsJson?.series?.length)
+        && (!interviewsJson?.passRate?.length)
+        && (!distInterviewsJson?.perUser?.length)
+        && (!distMcqDescJson?.values?.length)
+        && (!distRoundPassJson?.byRound?.length);
+      if (allEmpty) {
+        const [s2, i2, d1, d2, d3] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/admin/metrics/timeseries?metric=signups&granularity=day`, { headers }),
+          fetch(`${API_BASE_URL}/api/admin/metrics/timeseries?metric=interviews&granularity=day`, { headers }),
+          fetch(`${API_BASE_URL}/api/admin/metrics/distribution?type=interviews_per_user`, { headers }),
+          fetch(`${API_BASE_URL}/api/admin/metrics/distribution?type=mcq_desc`, { headers }),
+          fetch(`${API_BASE_URL}/api/admin/metrics/distribution?type=round_pass`, { headers }),
+        ]);
+        const [sj2, ij2, dj1, dj2, dj3] = await Promise.all([s2.json(), i2.json(), d1.json(), d2.json(), d3.json()]);
+        try {
+          console.groupCollapsed('[Admin Charts] Fallback fetch sizes');
+          console.log('signups.series:', Array.isArray(sj2?.series) ? sj2.series.length : 0);
+          console.log('interviews.series:', Array.isArray(ij2?.series) ? ij2.series.length : 0);
+          console.log('interviews.passRate:', Array.isArray(ij2?.passRate) ? ij2.passRate.length : 0);
+          console.log('dist.interviews_per_user:', Array.isArray(dj1?.perUser) ? dj1.perUser.length : 0);
+          console.log('dist.mcq_desc:', Array.isArray(dj2?.values) ? dj2.values.length : 0);
+          console.log('dist.round_pass:', Array.isArray(dj3?.byRound) ? dj3.byRound.length : 0);
+          console.groupEnd();
+        } catch {}
+        if (s2.ok) setTsSignups(Array.isArray(sj2.series) ? sj2.series : []);
+        if (i2.ok) {
+          setTsInterviews(Array.isArray(ij2.series) ? ij2.series : []);
+          setTsPassRate(Array.isArray(ij2.passRate) ? ij2.passRate : []);
+        }
+        if (d1.ok) setDistInterviewsPerUser(Array.isArray(dj1.perUser) ? dj1.perUser : []);
+        if (d2.ok) setDistMcqDesc(Array.isArray(dj2.values) ? dj2.values : []);
+        if (d3.ok) setDistRoundPass(Array.isArray(dj3.byRound) ? dj3.byRound : []);
+      }
+    } catch (e) {
+      console.error('Charts fetch error:', e);
+    } finally {
+      setChartsLoading(false);
+    }
+  };
+
+  const fetchMetrics = async () => {
+    setMetricsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/metrics/overview`, {
+        headers: { Authorization: `Bearer ${user?.token || localStorage.getItem('token')}` },
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setMetrics(json);
+      } else {
+        console.error('Failed to load metrics', res.status, json);
+        setError(`Failed to load metrics: ${res.status} ${json?.error || json?.message || ''}`.trim());
+      }
+    } catch (e) {
+      console.error('Metrics fetch error:', e);
+      setError(`Error loading metrics: ${e?.message || e}`);
+    } finally {
+      setMetricsLoading(false);
     }
   };
 
@@ -146,9 +341,67 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+    // Initialize active tab from URL param if present
+    const tab = (searchParams.get('tab') || '').toLowerCase();
+    if (tab === 'users' || tab === 'overview') setActiveTab(tab);
     fetchUsers(1, '');
+    fetchMetrics();
+    fetchCharts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep URL ?tab= in sync when activeTab changes
+  useEffect(() => {
+    const current = new URLSearchParams(searchParams);
+    current.set('tab', activeTab);
+    setSearchParams(current, { replace: true });
+    // Close mobile nav when switching tabs
+    setNavOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Close mobile drawer when viewport becomes desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) setNavOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Manage body scroll lock and ESC close while drawer is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    if (navOpen) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setNavOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = originalOverflow || '';
+    };
+  }, [navOpen]);
+
+  // When switching back to Overview, ensure charts are loaded
+  useEffect(() => {
+    if (activeTab === 'overview') {
+      const noData =
+        !(tsSignups?.length) &&
+        !(tsInterviews?.length) &&
+        !(tsPassRate?.length) &&
+        !(distInterviewsPerUser?.length) &&
+        !(distMcqDesc?.length) &&
+        !(distRoundPass?.length);
+      if (noData && !chartsLoading) {
+        fetchCharts();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // Helpers for carousels
   const currentSession = interviewData.sessions?.[sessionIndex] || null;
@@ -199,10 +452,10 @@ export default function AdminDashboard() {
   }, [currentRoundIndex, sessionIndex, currentRounds.length]);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden">
       <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-60 border-r border-gray-200 h-screen p-4 sticky top-0 overflow-hidden">
+        {/* Sidebar (desktop) */}
+        <aside className="hidden md:block w-60 border-r border-gray-200 h-screen p-4 sticky top-0 overflow-hidden">
           <button
             type="button"
             aria-label="Go to Dashboard"
@@ -241,23 +494,167 @@ export default function AdminDashboard() {
           </nav>
         </aside>
 
+        {/* Mobile sidebar drawer */}
+        {navOpen && (
+          <div className="fixed inset-0 z-40 md:hidden">
+            <div className="absolute inset-0 bg-black/30" onClick={() => setNavOpen(false)} />
+            <aside className="absolute left-0 top-0 h-full w-60 bg-white border-r border-gray-200 p-4 shadow-xl">
+              <button
+                type="button"
+                aria-label="Close menu"
+                className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+                onClick={() => setNavOpen(false)}
+              >
+                <X className="w-5 h-5" />
+                <span className="text-sm">Close</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Go to Dashboard"
+                onClick={() => { setNavOpen(false); navigate('/dashboard'); }}
+                className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+              >
+                <div className="w-8 h-8 flex items-center justify-center">
+                  <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-8 h-8 object-contain rounded" />
+                </div>
+                <div className="text-xl font-semibold">Resume Refiner</div>
+              </button>
+              <nav className="space-y-1">
+                <button
+                  className="w-full text-left px-3 py-2 rounded-md bg-gray-100 text-gray-900 font-medium"
+                  onClick={() => { setNavOpen(false); navigate('/dashboard'); }}
+                >
+                  Dashboard
+                </button>
+                <button
+                  className="w-full text-left px-3 py-2 rounded-md bg-gray-100 text-gray-900 font-medium"
+                  onClick={() => { setNavOpen(false); navigate('/admin'); }}
+                >
+                  Admin
+                </button>
+                <button
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                  onClick={() => { setNavOpen(false); setShowLogoutConfirm(true); }}
+                >
+                  Logout
+                </button>
+              </nav>
+            </aside>
+          </div>
+        )}
+
         {/* Main content */}
-        <main className="flex-1 p-6 overflow-y-auto max-h-screen">
-          {/* Top bar */}
-          {error && (
-            <div className="mb-4 p-3 border border-red-300 bg-red-50 text-red-800 rounded">
-              {error}
+        <main className="flex-1 p-6">
+          {/* Top bar (sticky on mobile) */}
+          <div className="md:static sticky top-0 z-30 bg-white">
+            {error && (
+              <div className="mb-2 p-3 border border-red-300 bg-red-50 text-red-800 rounded">
+                {error}
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 sm:mb-6">
+              <div className="flex items-center gap-3">
+              {/* Mobile hamburger */}
+              <button
+                type="button"
+                className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-md border border-gray-300 text-gray-800"
+                aria-label={navOpen ? 'Close menu' : 'Open menu'}
+                onClick={() => setNavOpen(v => !v)}
+              >
+                {navOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </button>
+              {/* Mobile logo + app name */}
+              <button
+                type="button"
+                className="md:hidden inline-flex items-center justify-center w-10 h-10"
+                aria-label="Go to Dashboard"
+                onClick={() => navigate('/dashboard')}
+              >
+                <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-9 h-9 object-contain rounded" />
+              </button>
+              <span className="md:hidden text-base font-semibold text-gray-900">Resume Refiner</span>
+              {/* Desktop: original two-line title */}
+              <div className="hidden md:block">
+                <div className="text-sm text-gray-500">Admin Panel</div>
+                <div className="text-xl font-semibold text-gray-900">User Management</div>
+              </div>
+              </div>
+              {/* Top bar search: desktop only */}
+              <div className="hidden md:flex items-center gap-2 w-auto">
+                <div className="relative w-full sm:w-auto">
+                  <input
+                    className="border border-gray-200 rounded-md px-3 py-2 w-full sm:w-64 text-sm"
+                    placeholder="Search by email"
+                    value={data.search}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setData(prev => ({ ...prev, search: v }));
+                      if (suggestTimer.current) clearTimeout(suggestTimer.current);
+                      suggestTimer.current = setTimeout(() => fetchUserSuggestions(v), 250);
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') fetchUsers(1, data.search); }}
+                    onFocus={() => { if (data.search) fetchUserSuggestions(data.search); }}
+                    onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
+                  />
+                  {suggestOpen && (
+                    <div className="absolute z-20 mt-1 w-full sm:w-64 bg-white border border-gray-200 rounded-md shadow">
+                      {suggestLoading ? (
+                        <div className="px-3 py-2 text-sm text-gray-600">Searching…</div>
+                      ) : searchSuggestions.length ? (
+                        <ul className="max-h-60 overflow-auto">
+                          {searchSuggestions.map((u) => (
+                            <li key={u._id}>
+                              <button
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setSuggestOpen(false);
+                                  setData(prev => ({ ...prev, search: u.email }));
+                                  fetchUsers(1, u.email);
+                                }}
+                              >{u.email}</button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-gray-600">No matches</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <button className="px-4 py-2 sm:py-2 bg-black text-white rounded-md text-sm w-full sm:w-auto" onClick={() => fetchUsers(1, data.search)}>
+                  Search
+                </button>
+              </div>
             </div>
-          )}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="text-sm text-gray-500">Admin Panel</div>
-              <div className="text-xl font-semibold text-gray-900">User Management</div>
+            {/* Mobile-only Admin Panel heading below the top bar */}
+            <div className="md:hidden mb-2">
+              <div className="text-lg font-semibold text-gray-900">Admin Panel</div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
+          </div>
+          {/* In-page tabs */}
+          <div className="mb-4 border-b border-gray-200">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={`px-3 py-2 text-sm rounded-t-md ${activeTab === 'overview' ? 'bg-gray-100 text-gray-900 border border-b-0 border-gray-200' : 'text-gray-700 hover:bg-gray-50'}`}
+                onClick={() => setActiveTab('overview')}
+              >Overview</button>
+              <button
+                type="button"
+                className={`px-3 py-2 text-sm rounded-t-md ${activeTab === 'users' ? 'bg-gray-100 text-gray-900 border border-b-0 border-gray-200' : 'text-gray-700 hover:bg-gray-50'}`}
+                onClick={() => setActiveTab('users')}
+              >Users</button>
+            </div>
+          </div>
+
+          {/* Mobile-only search row for Users tab */}
+          {activeTab === 'users' && (
+            <div className="md:hidden mb-3 flex items-stretch gap-2">
+              <div className="relative w-full">
                 <input
-                  className="border border-gray-200 rounded-md px-3 py-2 w-64 text-sm"
+                  className="border border-gray-200 rounded-md px-3 py-2 w-full text-sm"
                   placeholder="Search by email"
                   value={data.search}
                   onChange={(e) => {
@@ -271,7 +668,7 @@ export default function AdminDashboard() {
                   onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
                 />
                 {suggestOpen && (
-                  <div className="absolute z-20 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow">
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-md shadow">
                     {suggestLoading ? (
                       <div className="px-3 py-2 text-sm text-gray-600">Searching…</div>
                     ) : searchSuggestions.length ? (
@@ -297,77 +694,360 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
-              <button className="px-4 py-2 bg-black text-white rounded-md text-sm" onClick={() => fetchUsers(1, data.search)}>
+              <button className="px-4 py-2 bg-black text-white rounded-md text-sm w-28" onClick={() => fetchUsers(1, data.search)}>
                 Search
               </button>
             </div>
-          </div>
+          )}
 
-          <div className="space-y-5">
-            {/* Users list - full width */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-              <div className="grid grid-cols-4 font-medium text-gray-900 mb-2">
-                <div>Email</div>
-                <div>Resumes</div>
-                <div>Interviews</div>
-                <div>Created</div>
-              </div>
-              <div className="divide-y divide-gray-200 border-t border-b border-gray-200">
-                {loading ? (
-                  <div className="py-6 text-gray-600">Loading...</div>
+          {/* Metrics toolbar (Overview tab only): last updated + refresh */}
+          {activeTab === 'overview' && (
+            <div className="mb-4 flex items-center gap-3">
+              <div className="text-xs text-gray-500">
+                {metrics?.lastUpdated ? (
+                  <>Metrics last updated: {new Date(metrics.lastUpdated).toLocaleString()}</>
                 ) : (
-                  data.users.map(u => (
+                  <>Metrics loading…</>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => { fetchMetrics(); fetchCharts(); }}
+                className="inline-flex items-center justify-center w-8 h-8 border border-gray-300 rounded bg-white hover:bg-gray-50 text-gray-800"
+                aria-label="Refresh metrics"
+                title="Refresh metrics"
+              >
+                <RefreshCw className={`w-4 h-4 ${metricsLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          )}
+
+          {/* KPI cards (Overview tab) */}
+          {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {/* Total Users */}
+            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <div className="text-sm text-gray-500">Total Users</div>
+              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics?.totalUsers ?? '—')}</div>
+            </div>
+            {/* New Users */}
+            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <div className="text-sm text-gray-500">New Users (7d / 30d)</div>
+              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : `${metrics?.newUsers7d ?? 0} / ${metrics?.newUsers30d ?? 0}`}</div>
+            </div>
+            {/* Verified Users */}
+            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <div className="text-sm text-gray-500">Verified Users</div>
+              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics?.verifiedUsers ?? 0)}</div>
+            </div>
+            {/* Resume Uploads Total */}
+            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <div className="text-sm text-gray-500">Resume Uploads</div>
+              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics?.resumeUploadsTotal ?? 0)}</div>
+            </div>
+          </div>
+          )}
+
+          {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
+            {/* Total Interviews */}
+            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <div className="text-sm text-gray-500">Total Interviews (All Users)</div>
+              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics?.totalInterviews ?? 0)}</div>
+            </div>
+            {/* Avg Rounds Passed / Interview */}
+            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <div className="text-sm text-gray-500">Avg Rounds Passed / Interview</div>
+              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics ? (metrics.avgRoundsPassedPerInterview?.toFixed?.(2) ?? '0.00') : '—')}</div>
+            </div>
+            {/* Overall Round Pass Rate */}
+            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <div className="text-sm text-gray-500">Overall Round Pass Rate</div>
+              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics ? `${Math.round((metrics.overallRoundPassRate || 0) * 100)}%` : '—')}</div>
+            </div>
+            {/* DAU / MAU (ratio) */}
+            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <div className="text-sm text-gray-500">DAU / MAU (Ratio)</div>
+              <div className="text-2xl font-semibold text-gray-900">
+                {metricsLoading ? '—' : (metrics ? `${metrics.dau ?? 0} / ${metrics.mau ?? 0} (${(metrics.dauMauRatio ?? 0).toFixed(2)})` : '—')}
+              </div>
+            </div>
+          </div>
+          )}
+
+          {/* Secondary KPI row with page-level numbers (Overview tab) */}
+          {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {/* Interviews (This Page) */}
+            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <div className="text-sm text-gray-500">Interviews (This Page)</div>
+              <div className="text-2xl font-semibold text-gray-900">
+                {(() => {
+                  try {
+                    const ids = Array.isArray(data.users) ? data.users.map(u => u?._id).filter(Boolean) : [];
+                    const sum = ids.reduce((acc, id) => acc + (Number.isFinite(interviewCounts[id]) ? interviewCounts[id] : 0), 0);
+                    return sum;
+                  } catch { return 0; }
+                })()}
+              </div>
+            </div>
+          </div>
+          )}
+
+          {activeTab === 'overview' && (
+          <div className="space-y-6">
+            <h2 className="text-base font-semibold text-gray-900">Analytics</h2>
+            {/* Signups over time */}
+            <div className="border border-gray-200 rounded-xl bg-white md:p-4 p-0 -mx-4 md:mx-0">
+              <div className="text-sm text-gray-700 mb-2 px-4 md:px-0 pt-3 md:pt-0">User Signups Over Time (Daily)</div>
+              <div className="h-64">
+                {chartsLoading ? (
+                  <div className="h-full w-full flex items-center justify-center text-xs text-gray-500">Loading chart…</div>
+                ) : tsSignups.length === 0 ? (
+                  <div className="h-full w-full flex items-center justify-center text-xs text-gray-500">No data</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={tsSignups} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="key" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="value" name="Signups" stroke="#111827" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            {/* Interviews over time + pass rate */}
+            <div className="border border-gray-200 rounded-xl bg-white md:p-4 p-0 -mx-4 md:mx-0">
+              <div className="text-sm text-gray-700 mb-2 px-4 md:px-0 pt-3 md:pt-0">Interviews Over Time (Daily) & Pass Rate</div>
+              <div className="h-64">
+                {chartsLoading ? (
+                  <div className="h-full w-full flex items-center justify-center text-xs text-gray-500">Loading chart…</div>
+                ) : tsInterviews.length === 0 && tsPassRate.length === 0 ? (
+                  <div className="h-full w-full flex items-center justify-center text-xs text-gray-500">No data</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={mergeSeries(tsInterviews, tsPassRate)} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="key" tick={{ fontSize: 12 }} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
+                      <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${Math.round(v * 100)}%`} tick={{ fontSize: 12 }} />
+                      <Tooltip formatter={(val, name) => name === 'Pass Rate' ? `${Math.round(val * 100)}%` : val} />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="interviews" name="Interviews" fill="#9CA3AF" />
+                      <Line yAxisId="right" type="monotone" dataKey="rate" name="Pass Rate" stroke="#111827" strokeWidth={2} dot={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            {/* Interviews per user histogram */}
+            <div className="border border-gray-200 rounded-xl bg-white md:p-4 p-0 -mx-4 md:mx-0">
+              <div className="text-sm text-gray-700 mb-2 px-4 md:px-0 pt-3 md:pt-0">Distribution: Interviews per User</div>
+              <div className="h-64">
+                {chartsLoading ? (
+                  <div className="h-full w-full flex items-center justify-center text-xs text-gray-500">Loading chart…</div>
+                ) : distInterviewsPerUser.length === 0 ? (
+                  <div className="h-full w-full flex items-center justify-center text-xs text-gray-500">No data</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={bucketInterviews(distInterviewsPerUser)} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="count" name="# Users" fill="#111827" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            {/* MCQ vs Descriptive performance distribution */}
+            <div className="border border-gray-200 rounded-xl bg-white md:p-4 p-0 -mx-4 md:mx-0">
+              <div className="text-sm text-gray-700 mb-2 px-4 md:px-0 pt-3 md:pt-0">MCQ vs Descriptive Performance Distribution</div>
+              <div className="h-64">
+                {chartsLoading ? (
+                  <div className="h-full w-full flex items-center justify-center text-xs text-gray-500">Loading chart…</div>
+                ) : distMcqDesc.length === 0 ? (
+                  <div className="h-full w-full flex items-center justify-center text-xs text-gray-500">No data</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={bucketMcqDesc(distMcqDesc)} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="mcq" name="MCQ" fill="#111827" />
+                      <Bar dataKey="desc" name="Descriptive" fill="#9CA3AF" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            {/* Pass/fail by round */}
+            <div className="border border-gray-200 rounded-xl bg-white md:p-4 p-0 -mx-4 md:mx-0">
+              <div className="text-sm text-gray-700 mb-2 px-4 md:px-0 pt-3 md:pt-0">Pass/Fail by Round</div>
+              <div className="h-64">
+                {chartsLoading ? (
+                  <div className="h-full w-full flex items-center justify-center text-xs text-gray-500">Loading chart…</div>
+                ) : distRoundPass.length === 0 ? (
+                  <div className="h-full w-full flex items-center justify-center text-xs text-gray-500">No data</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={distRoundPass} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="round" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="passed" name="Passed" fill="#10B981" />
+                      <Bar dataKey="failed" name="Failed" fill="#EF4444" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+          </div>
+          )}
+
+          {activeTab === 'users' && (
+          <div className="space-y-5">
+            {/* Users list - mobile stacked cards */}
+            <div className="md:hidden space-y-2">
+              {loading ? (
+                <div className="py-8 text-center text-gray-600">Loading…</div>
+              ) : data.users.length === 0 ? (
+                <div className="py-8 text-center text-gray-600 border border-dashed border-gray-300 rounded-lg">No users found</div>
+              ) : (
+                data.users.map((u) => {
+                  const interviews = typeof interviewCounts[u._id] !== 'undefined' ? interviewCounts[u._id] : '—';
+                  const date = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-';
+                  return (
                     <button
                       key={u._id}
                       onClick={() => fetchUserDetails(u)}
-                      className={`grid grid-cols-4 w-full text-left py-3 hover:bg-gray-100 ${selectedUser?._id === u._id ? 'bg-gray-100' : ''}`}
+                      className={`w-full text-left bg-white rounded-lg p-3 border border-gray-200 ${selectedUser?._id === u._id ? 'ring-2 ring-blue-500' : 'hover:bg-gray-50'}`}
                     >
-                      <div className="truncate text-gray-900">{u.email}</div>
-                      <div className="text-gray-700">{u.resumeUploadCount ?? 0}</div>
-                      <div className="text-gray-700">{typeof interviewCounts[u._id] !== 'undefined' ? interviewCounts[u._id] : '—'}</div>
-                      <div className="text-gray-700">{u.createdAt ? new Date(u.createdAt).toLocaleString() : '-'}</div>
+                      <div className="flex items-center justify-between">
+                        <div className="truncate pr-2 font-medium text-gray-900">{u.email}</div>
+                        <span className="shrink-0 text-gray-400">›</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">Resumes: {u.resumeUploadCount ?? 0}</span>
+                        <span className="text-xs px-2 py-0.5 bg-green-50 text-green-700 rounded-full">Interviews: {interviews}</span>
+                        <span className="text-xs px-2 py-0.5 bg-gray-50 text-gray-600 rounded-full">{date}</span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+
+              {/* Pagination */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 disabled:opacity-50"
+                    onClick={() => fetchUsers(Math.max(1, data.page - 1), data.search)}
+                    disabled={data.page <= 1}
+                  >
+                    Previous
+                  </button>
+                  <div className="px-2 text-sm text-gray-700">{data.page} / {Math.max(1, Math.ceil(data.total / data.limit))}</div>
+                  <button
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 disabled:opacity-50"
+                    onClick={() => fetchUsers(data.page + 1, data.search)}
+                    disabled={data.page >= Math.ceil(data.total / data.limit)}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Users list - desktop/tablet grid */}
+            <div className="hidden md:block bg-gray-50 border border-gray-200 rounded-xl overflow-x-auto">
+              <div className="w-full grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 border-b border-gray-200">
+                <div className="col-span-5 font-medium text-gray-900">Email</div>
+                <div className="col-span-2 font-medium text-gray-900 text-center">Resumes</div>
+                <div className="col-span-2 font-medium text-gray-900 text-center">Interviews</div>
+                <div className="col-span-3 font-medium text-gray-900 text-right">Created</div>
+              </div>
+              <div className="w-full space-y-2 p-1">
+                {loading ? (
+                  <div className="py-6 text-center text-gray-600">Loading...</div>
+                ) : data.users.length === 0 ? (
+                  <div className="py-6 text-center text-gray-600">No users found</div>
+                ) : (
+                  data.users.map((u) => (
+                    <button
+                      key={u._id}
+                      onClick={() => fetchUserDetails(u)}
+                      className={`w-full grid grid-cols-12 gap-4 items-center py-2 px-3 rounded hover:bg-gray-100 ${selectedUser?._id === u._id ? 'bg-blue-50' : ''}`}
+                    >
+                      <div className="col-span-5 truncate text-sm">{u.email}</div>
+                      <div className="col-span-2 text-center text-gray-700 text-sm">{u.resumeUploadCount ?? 0}</div>
+                      <div className="col-span-2 text-center text-gray-700 text-sm">
+                        {typeof interviewCounts[u._id] !== 'undefined' ? interviewCounts[u._id] : '—'}
+                      </div>
+                      <div className="col-span-3 text-right text-gray-700 text-xs truncate">
+                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}
+                      </div>
                     </button>
                   ))
                 )}
               </div>
-              <div className="flex justify-between items-center pt-4">
-                <button
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 disabled:opacity-50"
-                  onClick={() => fetchUsers(Math.max(1, data.page - 1), data.search)}
-                  disabled={data.page <= 1}
-                >
-                  Previous
-                </button>
-                <div className="text-sm text-gray-700">
-                  Page {data.page} of {Math.max(1, Math.ceil(data.total / data.limit))}
-                </div>
-                <button
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 disabled:opacity-50"
-                  onClick={() => fetchUsers(data.page + 1, data.search)}
-                  disabled={data.page >= Math.ceil(data.total / data.limit)}
-                >
-                  Next
-                </button>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex justify-between items-center pt-4">
+              <button
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 disabled:opacity-50"
+                onClick={() => fetchUsers(Math.max(1, data.page - 1), data.search)}
+                disabled={data.page <= 1}
+              >
+                Previous
+              </button>
+              <div className="text-sm text-gray-700">
+                Page {data.page} of {Math.max(1, Math.ceil(data.total / data.limit))}
               </div>
+              <button
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 disabled:opacity-50"
+                onClick={() => fetchUsers(data.page + 1, data.search)}
+                disabled={data.page >= Math.ceil(data.total / data.limit)}
+              >
+                Next
+              </button>
             </div>
 
             {/* Test details - full width under users list */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 min-h-[200px]">
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 min-h-[200px] overflow-x-hidden">
               {!selectedUser ? (
                 <div className="h-full w-full flex items-center justify-center text-gray-600">
                   Select a user to view details
                 </div>
               ) : (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <div className="text-lg font-semibold text-gray-900">{selectedUser.email}</div>
-                      <div className="text-sm text-gray-500">User ID: {selectedUser._id}</div>
+                <div className="w-full max-w-full">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-4">
+                    <div className="min-w-0 max-w-full overflow-hidden">
+                      <div className="text-base sm:text-lg font-semibold text-gray-900 break-all">{selectedUser.email}</div>
+                      <div className="text-xs sm:text-sm text-gray-500 break-all">ID: {selectedUser._id}</div>
                     </div>
-                    {detailLoading && <div className="text-sm text-gray-500">Loading...</div>}
+                    {detailLoading && (
+                      <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
+                        Loading...
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                     <div className="p-3 border border-gray-200 rounded-lg bg-white">
                       <div className="text-sm text-gray-500">Resume Uploads</div>
                       <div className="text-2xl font-semibold text-gray-900">{resumeCount ?? '—'}</div>
@@ -678,6 +1358,7 @@ export default function AdminDashboard() {
               )}
             </div>
           </div>
+          )}
         </main>
       </div>
 
