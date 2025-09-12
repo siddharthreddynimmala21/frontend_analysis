@@ -349,20 +349,15 @@ export default function Chat() {
   };
 
   const saveChatHistoryToDatabase = async () => {
-    if (user && currentChatId && selectedResumeId && messages.length > 0) {
+    // Always bind chat history to the chat session's own resumeId
+    const session = chatSessions.find(session => session.id === currentChatId);
+    const sessionResumeId = session?.resumeId || selectedResumeId;
+    if (user && currentChatId && sessionResumeId && messages.length > 0) {
       try {
         console.log('Saving chat history to database for chat ID:', currentChatId);
         const currentSession = chatSessions.find(session => session.id === currentChatId);
         const chatName = currentSession ? currentSession.name : `Chat ${new Date().toLocaleDateString()}`;
-        
-        // Ensure the selected resume exists in the resumes array
-        const resumeExists = resumes.some(resume => resume.id === selectedResumeId);
-        if (!resumeExists && resumes.length > 0) {
-          console.warn('Selected resume not found, using first available resume');
-          setSelectedResumeId(resumes[0].id);
-        }
-        
-        const finalResumeId = resumeExists ? selectedResumeId : (resumes.length > 0 ? resumes[0].id : selectedResumeId);
+        const finalResumeId = sessionResumeId;
         
         await saveChatHistory({
           chatId: currentChatId,
@@ -417,7 +412,7 @@ export default function Chat() {
     }
   };
 
-  const createNewChat = async () => {
+  const createNewChat = async (explicitResumeId = null) => {
     if (isCreatingChat) return;
     setIsCreatingChat(true);
     try {
@@ -428,7 +423,9 @@ export default function Chat() {
       }
     
       // Determine the resume to use for the new chat
-      let finalResumeId = selectedResumeId;
+      // Prefer the explicitly provided resumeId (e.g., just uploaded),
+      // then fall back to the currently selected resumeId
+      let finalResumeId = explicitResumeId || selectedResumeId;
       let selectedResume = null;
       let chatName = 'General Chat';
       let initialMessage = {
@@ -438,10 +435,10 @@ export default function Chat() {
         timestamp: new Date()
       };
       
-      // If we have resumes available and one is selected, use it
+      // If we have resumes available and a specific resume is targeted, use it as-is without overriding
       if (resumes.length > 0) {
-        // If no resume is selected or selected resume doesn't exist, use the first available
-        if (!finalResumeId || !resumes.some(resume => resume.id === finalResumeId)) {
+        // Only override if finalResumeId is not set at all
+        if (!finalResumeId) {
           finalResumeId = resumes[0].id;
         }
         
@@ -650,9 +647,9 @@ export default function Chat() {
           }
         }, 1000);
         
-        // Create new chat after a short delay to ensure state is updated
+        // Create new chat bound to the newly uploaded resumeId
         setTimeout(() => {
-          createNewChat();
+          createNewChat(resumeId);
         }, 200);
         
         console.log('Resume upload and setup completed successfully');
