@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import { motion } from 'framer-motion';
-import { FileText, Upload, Briefcase, Wand2 } from 'lucide-react';
+import { FileText, Upload, Briefcase, Wand2, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -23,6 +23,7 @@ export default function ResumeAnalyzer() {
   const [error, setError] = useState(null);
   const [jobDescriptionOption, setJobDescriptionOption] = useState('paste'); // 'paste' or 'generate'
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -181,8 +182,67 @@ export default function ResumeAnalyzer() {
         </nav>
       </aside>
 
+      {/* Mobile sidebar drawer (matches AdminDashboard) */}
+      {navOpen && (
+        <div className="fixed inset-0 z-40 sm:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setNavOpen(false)} />
+          <aside className="absolute left-0 top-0 h-full w-60 bg-white border-r border-gray-200 p-4 shadow-xl">
+            <button
+              type="button"
+              aria-label="Close menu"
+              className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+              onClick={() => setNavOpen(false)}
+            >
+              <X className="w-5 h-5" />
+              <span className="text-sm">Close</span>
+            </button>
+            <button
+              type="button"
+              aria-label="Go to Dashboard"
+              onClick={() => { setNavOpen(false); navigate('/dashboard'); }}
+              className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+            >
+              <div className="w-8 h-8 flex items-center justify-center">
+                <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-8 h-8 object-contain rounded" />
+              </div>
+              <div className="text-xl font-semibold">Resume Refiner</div>
+            </button>
+            <nav className="space-y-1">
+              <button
+                className="w-full text-left px-3 py-2 rounded-md bg-gray-100 text-gray-900 font-medium"
+                onClick={() => { setNavOpen(false); navigate('/dashboard'); }}
+              >
+                Dashboard
+              </button>
+              {!isAdmin && (
+                <button
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                  onClick={() => { setNavOpen(false); alert('Profile feature is coming soon.'); }}
+                >
+                  My Profile
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  className="w-full text-left px-3 py-2 rounded-md bg-gray-100 text-gray-900 font-medium"
+                  onClick={() => { setNavOpen(false); navigate('/admin'); }}
+                >
+                  Admin
+                </button>
+              )}
+              <button
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                onClick={() => { setNavOpen(false); setShowLogoutConfirm(true); }}
+              >
+                Logout
+              </button>
+            </nav>
+          </aside>
+        </div>
+      )}
+
       {/* Content wrapper shifted to accommodate fixed sidebar */}
-      <div className="flex flex-1 w-full ml-0 sm:ml-60 min-h-screen px-4 py-4 overflow-y-auto">
+      <div className="flex flex-col sm:flex-row flex-1 w-full ml-0 sm:ml-60 min-h-screen px-4 py-4 overflow-y-auto">
       {/* Loading Overlay */}
       {isLoading && (
         <motion.div 
@@ -211,16 +271,38 @@ export default function ResumeAnalyzer() {
         initial="hidden"
         animate="visible"
       >
-        
+        {/* Mobile top bar (hamburger, logo, title) matching AdminDashboard */}
+        <div className="sm:hidden sticky top-0 z-30 bg-white mb-3 w-full shrink-0">
+          <div className="flex items-center gap-3 w-full">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-md border border-gray-300 text-gray-800"
+              aria-label={navOpen ? 'Close menu' : 'Open menu'}
+              onClick={() => setNavOpen(v => !v)}
+            >
+              {navOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center w-10 h-10"
+              aria-label="Go to Dashboard"
+              onClick={() => navigate('/dashboard')}
+            >
+              <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-9 h-9 object-contain rounded" />
+            </button>
+            <span className="text-base font-semibold text-gray-900">Resume Refiner</span>
+          </div>
+        </div>
+
         <motion.div
           className="w-full bg-white border border-gray-200 rounded-2xl shadow-lg p-4 md:p-6 flex flex-col h-auto"
           variants={cardVariants}
         >
           <div className="mb-6 flex items-center">
-            <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center mr-4">
-              <Briefcase className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-900 rounded-xl flex items-center justify-center mr-4">
+              <Briefcase className="w-5 h-5 md:w-6 md:h-6 text-white" />
             </div>
-            <h2 className="text-xl font-bold">Analyze Your Resume</h2>
+            <h2 className="text-lg md:text-xl font-bold">Analyze Your Resume</h2>
           </div>
           {/* Content area */}
           <div>

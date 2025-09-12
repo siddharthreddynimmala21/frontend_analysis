@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Upload, Wand2, Brain } from 'lucide-react';
+import { FileText, Upload, Wand2, Brain, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -46,6 +46,7 @@ export default function AIInterview() {
   const descTextareaRef = useRef(null);
   // Sidebar logout confirmation (only for setup/details view)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   // Session ID Management:
   // - Round 1: Generate new session ID (backend creates new interview)
@@ -860,8 +861,90 @@ export default function AIInterview() {
         </aside>
       )}
 
+      {/* Mobile sidebar drawer (matches AdminDashboard) */}
+      {navOpen && (
+        <div className="fixed inset-0 z-40 sm:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setNavOpen(false)} />
+          <aside className="absolute left-0 top-0 h-full w-60 bg-white border-r border-gray-200 p-4 shadow-xl">
+            <button
+              type="button"
+              aria-label="Close menu"
+              className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+              onClick={() => setNavOpen(false)}
+            >
+              <X className="w-5 h-5" />
+              <span className="text-sm">Close</span>
+            </button>
+            <button
+              type="button"
+              aria-label="Go to Dashboard"
+              onClick={() => { setNavOpen(false); navigate('/dashboard'); }}
+              className="flex items-center gap-2 px-2 mb-6 cursor-pointer select-none hover:opacity-90 transition"
+            >
+              <div className="w-8 h-8 flex items-center justify-center">
+                <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-8 h-8 object-contain rounded" />
+              </div>
+              <div className="text-xl font-semibold">Resume Refiner</div>
+            </button>
+            <nav className="space-y-1">
+              <button
+                className="w-full text-left px-3 py-2 rounded-md bg-gray-100 text-gray-900 font-medium"
+                onClick={() => { setNavOpen(false); navigate('/dashboard'); }}
+              >
+                Dashboard
+              </button>
+              {!isAdmin && (
+                <button
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                  onClick={() => { setNavOpen(false); alert('Profile feature is coming soon.'); }}
+                >
+                  My Profile
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  className="w-full text-left px-3 py-2 rounded-md bg-gray-100 text-gray-900 font-medium"
+                  onClick={() => { setNavOpen(false); navigate('/admin'); }}
+                >
+                  Admin
+                </button>
+              )}
+              <button
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"
+                onClick={() => { setNavOpen(false); setShowLogoutConfirm(true); }}
+              >
+                Logout
+              </button>
+            </nav>
+          </aside>
+        </div>
+      )}
+
       {/* Content wrapper; shift when sidebar is visible */}
-      <div className={`flex flex-1 w-full min-h-screen px-4 py-6 overflow-x-hidden overflow-y-auto ${!inExamMode ? 'ml-0 sm:ml-60' : ''}`}>
+      <div className={`flex flex-col sm:flex-row flex-1 w-full min-h-screen px-4 py-6 overflow-x-hidden overflow-y-auto ${!inExamMode ? 'ml-0 sm:ml-60' : ''}`}>
+
+      {/* Mobile top bar (hamburger, logo, title) matching AdminDashboard */}
+      <div className="sm:hidden sticky top-0 z-30 bg-white mb-3 w-full shrink-0">
+        <div className="flex items-center gap-3 w-full">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center w-9 h-9 rounded-md border border-gray-300 text-gray-800"
+            aria-label={navOpen ? 'Close menu' : 'Open menu'}
+            onClick={() => setNavOpen(v => !v)}
+          >
+            {navOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center w-10 h-10"
+            aria-label="Go to Dashboard"
+            onClick={() => navigate('/dashboard')}
+          >
+            <img src="/new_logo.png" alt="ResumeRefiner Logo" className="w-9 h-9 object-contain rounded" />
+          </button>
+          <span className="text-base font-semibold text-gray-900">Resume Refiner</span>
+        </div>
+      </div>
 
       {/* Loading Overlay */}
       {isLoading && (
@@ -872,15 +955,17 @@ export default function AIInterview() {
           transition={{ duration: 0.3 }}
         >
           <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-            <div className="flex justify-center mb-6">
-              <svg className="animate-spin h-12 w-12 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold mb-4 text-gray-900">Starting Interview Practice</h3>
-            <p className="text-gray-600 mb-6">Generating personalized questions based on your resume and job description.</p>
-            <p className="text-gray-700 font-medium">This may take a few moments...</p>
+            <main className="flex-1 p-6">
+              <div className="flex justify-center mb-6">
+                <svg className="animate-spin h-12 w-12 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-4 text-gray-900">Starting Interview Practice</h3>
+              <p className="text-gray-600 mb-6">Generating personalized questions based on your resume and job description.</p>
+              <p className="text-gray-700 font-medium">This may take a few moments...</p>
+            </main>
           </div>
         </motion.div>
       )}
@@ -897,14 +982,14 @@ export default function AIInterview() {
           variants={cardVariants}
         >
           <div className="mb-6 flex items-center">
-            <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center mr-4">
-              <Brain className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-900 rounded-xl flex items-center justify-center mr-4">
+              <Brain className="w-5 h-5 md:w-6 md:h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">AI Interview Practice</h2>
-              <p className="text-sm text-gray-500">{getRoundName(currentRound)}</p>
+              <h2 className="text-lg md:text-xl font-bold">AI Interview Practice</h2>
+              <p className="text-xs md:text-sm text-gray-500">{getRoundName(currentRound)}</p>
               {sessionId && (
-                <p className="text-xs text-gray-500 mt-1">Session: {sessionId.slice(-8)}</p>
+                <p className="text-[11px] md:text-xs text-gray-500 mt-1">Session: {sessionId.slice(-8)}</p>
               )}
               {roundHistory.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
