@@ -135,7 +135,7 @@ export default function ResumeAnalyzer() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white text-gray-900">
+    <div className="flex min-h-screen overflow-y-auto bg-white text-gray-900">
       {/* Sidebar (fixed, Dashboard/Chat style) */}
       <aside className="fixed inset-y-0 left-0 w-60 border-r border-gray-200 p-4 hidden sm:flex flex-col bg-white">
         <button
@@ -182,7 +182,7 @@ export default function ResumeAnalyzer() {
       </aside>
 
       {/* Content wrapper shifted to accommodate fixed sidebar */}
-      <div className="flex flex-1 w-full ml-0 sm:ml-60 h-screen px-4 py-4 overflow-hidden">
+      <div className="flex flex-1 w-full ml-0 sm:ml-60 min-h-screen px-4 py-4 overflow-y-auto">
       {/* Loading Overlay */}
       {isLoading && (
         <motion.div 
@@ -206,7 +206,7 @@ export default function ResumeAnalyzer() {
       )}
       
       <motion.div 
-        className="flex-1 flex flex-col justify-center relative w-full max-w-5xl mx-auto my-0"
+        className="flex-1 flex flex-col justify-start relative w-full max-w-5xl mx-auto my-0"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
