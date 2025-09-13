@@ -78,6 +78,7 @@ export default function Chat() {
   const navigate = useNavigate();
   const { user, logout, isAdmin } = useAuth();
   const [messages, setMessages] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [resumes, setResumes] = useState([]);
@@ -416,6 +417,8 @@ export default function Chat() {
     if (isCreatingChat) return;
     setIsCreatingChat(true);
     try {
+      // Clear any existing suggestions when starting a new chat
+      setSuggestions([]);
       // Check if user has reached the maximum number of active chats
       if (chatSessions.length >= MAX_ACTIVE_CHATS) {
         alert(`You've reached the maximum limit of ${MAX_ACTIVE_CHATS} active chats. Please delete an existing chat before creating a new one.`);
@@ -487,6 +490,7 @@ export default function Chat() {
       
       // Set initial message immediately
       setMessages([initialMessage]);
+      setSuggestions([]);
       
       // Save to localStorage
       localStorage.setItem(`chat_sessions_${user.id}`, JSON.stringify(updatedSessions));
@@ -519,6 +523,8 @@ export default function Chat() {
       if (currentChatId && messages.length > 0) {
         await saveChatHistoryToDatabase();
       }
+      // Clear suggestions when switching chats
+      setSuggestions([]);
       // Always use the resumeId associated with this chat session
       setSelectedResumeId(session.resumeId);
       localStorage.setItem(`chat_selected_resume_${user.id}`, session.resumeId);
@@ -751,12 +757,6 @@ export default function Chat() {
         content: msg.text
       }));
       
-      // Ensure the selected resume exists in the resumes array
-      const resumeExists = resumes.some(resume => resume.id === selectedResumeId);
-      if (!resumeExists) {
-        throw new Error('Please upload your resume first');
-      }
-      
       const response = await sendMessage(message, recentMessages, selectedResumeId);
       setMessages(prev => [...prev, { 
         text: response.answer, 
@@ -764,6 +764,12 @@ export default function Chat() {
         relevantChunks: response.relevantChunks,
         confidence: response.confidence
       }]);
+      // Update follow-up suggestions after each bot response
+      if (response.followUpSuggestions && Array.isArray(response.followUpSuggestions)) {
+        setSuggestions(response.followUpSuggestions.slice(0, 3));
+      } else {
+        setSuggestions([]);
+      }
     } catch (error) {
       console.error('Error:', error);
       const errorMessage = error.response?.data?.error || 'Sorry, something went wrong. Please try again.';
@@ -775,6 +781,7 @@ export default function Chat() {
           isError: true
         }
       ]);
+      setSuggestions([]);
     } finally {
       setIsLoading(false);
     }
@@ -1144,6 +1151,23 @@ export default function Chat() {
 
                 {/* Input area */}
                 <div className="p-4 border-t border-gray-200 bg-white">
+                  {/* Follow-up suggestions */}
+                  {suggestions && suggestions.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {suggestions.map((s, idx) => (
+                        <button
+                          key={`${s}-${idx}`}
+                          type="button"
+                          className="text-sm px-3 py-1.5 rounded-full border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 disabled:opacity-50"
+                          disabled={isLoading}
+                          onClick={() => handleSendMessage(s)}
+                          title={s}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
                 </div>
               </>
