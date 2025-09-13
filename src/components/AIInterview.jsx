@@ -550,9 +550,26 @@ export default function AIInterview() {
       setValidation(validationData);
       toast.success(`Validation complete! Verdict: ${validationData.verdict}`);
 
-      // Generate styled HTML and trigger server-side PDF email
-      const html = buildReportHTML(validationData, { sessionId: sessionToUse, round: roundToUse });
-      emailPdfReport(html, { subject: 'Your AI Interview Report (PDF)', fileName: `interview_${sessionToUse || 'report'}.pdf` });
+      // Only send final consolidated report after the last round
+      const isFinalRound = Number(roundToUse) >= 4;
+      if (isFinalRound) {
+        try {
+          // Build a combined HTML using the same per-round style for ALL rounds
+          const allRounds = [...roundHistory, { round: roundToUse, validation: validationData }];
+          const combinedHtml = allRounds
+            .map(r => buildReportHTML(r.validation, { sessionId: sessionToUse, round: r.round }))
+            .join('<div style="page-break-after: always;"></div>');
+
+          await emailPdfReport(combinedHtml, {
+            subject: 'Your AI Interview Report (PDF)',
+            fileName: `interview_${sessionToUse || 'report'}_all_rounds.pdf`,
+          });
+          toast.success('Final interview report has been emailed');
+        } catch (finalErr) {
+          console.error('Final report email error:', finalErr);
+          toast.error(finalErr.message || 'Failed to send final interview report');
+        }
+      }
     } catch (err) {
       console.error('Submit/Validation error:', err);
       toast.error(err.message || 'Submit/Validation failed');
