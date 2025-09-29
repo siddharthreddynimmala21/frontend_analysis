@@ -81,6 +81,7 @@ export default function Chat() {
   const [suggestions, setSuggestions] = useState([]);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [resumes, setResumes] = useState([]);
   const [selectedResumeId, setSelectedResumeId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -95,6 +96,10 @@ export default function Chat() {
   const [showProfileInfo, setShowProfileInfo] = useState(false);
   // Logout confirmation
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  // Ref to messages container for auto-scroll
+  const messagesContainerRef = useRef(null);
+  // Ref to manage typing animation interval
+  const typingIntervalRef = useRef(null);
 
   // Load resumes and chat sessions on component mount
   useEffect(() => {
@@ -116,6 +121,27 @@ export default function Chat() {
     if (user && currentChatId) {
       loadChatHistory();
     }
+    // Clear any ongoing typing animation when switching chats
+    return () => {
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
+      }
+    };
+  }, [user, currentChatId]);
+
+  // Load persisted follow-up suggestions whenever chat changes
+  useEffect(() => {
+    try {
+      if (user && currentChatId) {
+        const key = `chat_suggestions_${user.id}_${currentChatId}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) setSuggestions(parsed);
+        }
+      }
+    } catch {}
   }, [user, currentChatId]);
 
   // Save chat history to database whenever messages change
@@ -130,6 +156,66 @@ export default function Chat() {
       return () => clearTimeout(saveTimeout);
     }
   }, [messages, user, currentChatId, selectedResumeId]);
+
+  // Auto-scroll to bottom on messages change or when loading finishes
+  useEffect(() => {
+    try {
+      const el = messagesContainerRef.current;
+      if (el) {
+        // Scroll immediately to bottom
+        el.scrollTop = el.scrollHeight;
+      }
+    } catch {}
+  }, [messages, isLoading, currentChatId]);
+
+  // Helper: start typewriter animation for bot response
+  const startTypewriter = (fullText) => {
+    // Ensure any previous animation is cleared
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current);
+      typingIntervalRef.current = null;
+    }
+
+    // Append placeholder bot message
+    setMessages((prev) => [...prev, { text: '', isBot: true }]);
+    // Start blocking new prompts while typing
+    setIsTyping(true);
+
+    const chunkSize = 3; // characters per tick (faster)
+    const intervalMs = 14; // typing speed (faster)
+    let i = 0;
+
+    typingIntervalRef.current = setInterval(() => {
+      i = Math.min(fullText.length, i + chunkSize);
+      const nextText = fullText.slice(0, i);
+      setMessages((prev) => {
+        if (prev.length === 0) return prev;
+        const updated = [...prev];
+        const lastIdx = updated.length - 1;
+        // Only update if last message is bot (placeholder)
+        if (updated[lastIdx]?.isBot) {
+          updated[lastIdx] = { ...updated[lastIdx], text: nextText };
+        }
+        return updated;
+      });
+
+      if (i >= fullText.length) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
+        // Allow new prompts once typing completes
+        setIsTyping(false);
+      }
+    }, intervalMs);
+  };
+
+  // Manually stop the typewriter animation and allow new prompts
+  const handleStopTyping = () => {
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current);
+      typingIntervalRef.current = null;
+    }
+    setIsTyping(false);
+  };
 
   // Cross-device synchronization using BroadcastChannel
   useEffect(() => {
@@ -758,17 +844,25 @@ export default function Chat() {
       }));
       
       const response = await sendMessage(message, recentMessages, selectedResumeId);
-      setMessages(prev => [...prev, { 
-        text: response.answer, 
-        isBot: true,
-        relevantChunks: response.relevantChunks,
-        confidence: response.confidence
-      }]);
+      // Typewriter animation for bot response
+      startTypewriter(response.answer || '');
       // Update follow-up suggestions after each bot response
       if (response.followUpSuggestions && Array.isArray(response.followUpSuggestions)) {
-        setSuggestions(response.followUpSuggestions.slice(0, 3));
+        const next = response.followUpSuggestions.slice(0, 3);
+        setSuggestions(next);
+        try {
+          if (user && currentChatId) {
+            localStorage.setItem(`chat_suggestions_${user.id}_${currentChatId}`, JSON.stringify(next));
+          }
+        } catch {}
       } else {
+        // Persist clearing as well to reflect latest state
         setSuggestions([]);
+        try {
+          if (user && currentChatId) {
+            localStorage.setItem(`chat_suggestions_${user.id}_${currentChatId}`, JSON.stringify([]));
+          }
+        } catch {}
       }
     } catch (error) {
       console.error('Error:', error);
@@ -989,7 +1083,7 @@ export default function Chat() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-600">Resumes ({resumes.length}/3)</span>
                 {resumes.length < 3 && (
-                  <label className="flex items-center space-x-1 px-2 py-1 bg-gray-900 hover:bg-black text-white rounded text-xs cursor-pointer transition-colors border border-gray-900">
+                  <label className={`flex items-center space-x-1 px-2 py-1 bg-gray-900 hover:bg-black text-white rounded text-xs transition-colors border border-gray-900 ${isUploading ? 'opacity-60 cursor-not-allowed pointer-events-none' : 'cursor-pointer'}`}>
                     <Upload className="w-3 h-3" />
                     <span>{isUploading ? 'Uploading...' : 'Upload PDF'}</span>
                     <input
@@ -1068,7 +1162,7 @@ export default function Chat() {
                   <p className="text-gray-600 mb-6">
                     Upload your resume (PDF) to start an intelligent conversation. You can upload up to 3 resumes.
                   </p>
-                  <label className="inline-flex items-center space-x-2 px-6 py-3 bg-gray-900 hover:bg-black text-white rounded-lg cursor-pointer transition-colors border border-gray-900">
+                  <label className={`inline-flex items-center space-x-2 px-6 py-3 bg-gray-900 hover:bg-black text-white rounded-lg transition-colors border border-gray-900 ${isUploading ? 'opacity-60 cursor-not-allowed pointer-events-none' : 'cursor-pointer'}`}>
                     <Upload className="w-5 h-5" />
                     <span>{isUploading ? 'Uploading...' : 'Choose PDF'}</span>
                     <input
@@ -1108,7 +1202,7 @@ export default function Chat() {
             {/* Messages container */}
             {!isLoadingResumes && currentChatId && (
               <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                   {messages.map((message, index) => (
                     <motion.div
                       key={index}
@@ -1159,7 +1253,7 @@ export default function Chat() {
                           key={`${s}-${idx}`}
                           type="button"
                           className="text-sm px-3 py-1.5 rounded-full border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 disabled:opacity-50"
-                          disabled={isLoading}
+                          disabled={isLoading || isTyping}
                           onClick={() => handleSendMessage(s)}
                           title={s}
                         >
@@ -1168,7 +1262,7 @@ export default function Chat() {
                       ))}
                     </div>
                   )}
-                  <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                  <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || isTyping} isTyping={isTyping} onStopTyping={handleStopTyping} />
                 </div>
               </>
             )}
