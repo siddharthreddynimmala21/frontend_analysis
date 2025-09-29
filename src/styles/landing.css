@@ -39,6 +39,22 @@
   .typewriter .caret { animation: none; }
 }
 
+/* Reserve space for hero text and layer animated text over it */
+.hero-title {
+  position: relative; /* ensure positioned context even if typewriter class changes */
+}
+.hero-title .hero-placeholder {
+  visibility: hidden; /* keep space, hide content */
+  display: block;     /* make sure it defines the full line height */
+}
+.hero-title .hero-animated {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: block;
+}
+
 /* Features */
 .landing-features { padding: 56px 0 72px; background: var(--bg-base); }
 .section-title { text-align:center; font-weight:700; font-size:28px; margin-bottom:8px; }

@@ -104,7 +104,6 @@ export default function Login() {
                   autoComplete="current-password"
                   required
                   className="bg-white border border-gray-300 focus:ring-2 focus:ring-gray-300 transition-all duration-200 appearance-none rounded-md block w-full pr-10 px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none sm:text-sm"
-                  placeholder="••••••••"
                   {...formik.getFieldProps('password')}
                 />
                 <button

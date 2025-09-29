@@ -54,7 +54,10 @@ export default function Landing() {
       <section className="landing-hero">
         <div className="landing-container hero-inner">
           <h1 className="hero-title typewriter">
-            <span>{typed}</span>
+            {/* Hidden placeholder reserves the full height so content below doesn't shift */}
+            <span className="hero-placeholder" aria-hidden="true">{fullTitle}</span>
+            {/* Absolutely positioned animated text sits on top in the reserved space */}
+            <span className="hero-animated">{typed}</span>
           </h1>
           <p className="hero-sub">
             Practice targeted interviews, chat with your resume, and get instant feedback to refine

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { register, verifyOTP, setupPassword } from '../../services/api';
 import { useNavigate, Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function Register() {
   const [resending, setResending] = useState(false);
@@ -14,10 +15,13 @@ export default function Register() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
+  const currentStep = otpVerified ? 3 : (emailVerified ? 2 : 1);
 
   // Handlers for unified flow
   const handleVerifyEmail = async () => {
@@ -94,9 +98,10 @@ export default function Register() {
           </div>
         </div>
 
-        {/* Unified Form */}
+        {/* Multi-step Form */}
         <div className="px-6 pb-6 space-y-4">
-          {/* Email + Verify */}
+          {/* Step 1: Email + Verify */}
+          {currentStep === 1 && (
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm text-gray-700">Email</label>
             <div className="flex gap-2 flex-col sm:flex-row">
@@ -105,7 +110,7 @@ export default function Register() {
                 type="email"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                className="flex-1 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-300 rounded-md px-4 py-2 text-sm"
+                className="flex-1 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-300 transition-all duration-200 appearance-none rounded-md block w-full px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none sm:text-sm"
                 placeholder="name@email.com"
               />
               <button
@@ -118,12 +123,14 @@ export default function Register() {
               </button>
             </div>
           </div>
+          )}
 
-          {/* OTP + Verify */}
-          <div className="space-y-2 opacity-100">
+          {/* Step 2: OTP + Verify */}
+          {currentStep === 2 && (
+          <div className="space-y-2">
             <label htmlFor="otp" className="text-sm text-gray-700">OTP</label>
             <div className="flex items-center gap-2 flex-col sm:flex-row">
-              <div className="flex gap-2 flex-wrap" onPaste={(e) => {
+              <div className="flex gap-2 flex-nowrap" onPaste={(e) => {
                 if (!emailVerified) return;
                 const text = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0,6);
                 if (!text) return;
@@ -166,7 +173,7 @@ export default function Register() {
                         otpRefs.current[idx+1]?.focus();
                       }
                     }}
-                    className="w-10 h-10 text-center text-base rounded-md border border-gray-300 focus:ring-2 focus:ring-gray-300"
+                    className="w-10 h-10 text-center text-base rounded-md border border-gray-300 focus:ring-2 focus:ring-gray-300 transition-all duration-200 appearance-none focus:outline-none"
                     placeholder=""
                   />
                 ))}
@@ -191,47 +198,92 @@ export default function Register() {
               </button>
             </div>
           </div>
+          )}
 
-          {/* Passwords */}
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-sm text-gray-700">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="bg-white border border-gray-300 focus:ring-2 focus:ring-gray-300 rounded-md px-4 py-2 text-sm w-full"
-              placeholder="••••••••"
-              disabled={!otpVerified}
-            />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="confirmPassword" className="text-sm text-gray-700">Confirm Password</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="bg-white border border-gray-300 focus:ring-2 focus:ring-gray-300 rounded-md px-4 py-2 text-sm w-full"
-              placeholder="••••••••"
-              disabled={!otpVerified}
-            />
-          </div>
+          {/* Step 3: Passwords */}
+          {currentStep === 3 && (
+          <>
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm text-gray-700">Password</label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="bg-white border border-gray-300 focus:ring-2 focus:ring-gray-300 transition-all duration-200 appearance-none rounded-md block w-full pr-10 px-4 py-2 text-gray-900 focus:outline-none sm:text-sm"
+                  disabled={!otpVerified}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-sm text-gray-700">Confirm Password</label>
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="bg-white border border-gray-300 focus:ring-2 focus:ring-gray-300 transition-all duration-200 appearance-none rounded-md block w-full pr-10 px-4 py-2 text-gray-900 focus:outline-none sm:text-sm"
+                  disabled={!otpVerified}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 focus:outline-none"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+          </>
+          )}
 
           {/* Actions */}
           <div className="flex items-center justify-between text-sm gap-3 flex-col sm:flex-row">
-            <div className="text-gray-600">
-              Already have an account?{' '}
-              <Link to="/login" className="font-medium text-gray-900 hover:underline">Login</Link>
-            </div>
-            <button
-              type="button"
-              onClick={handleCreateAccount}
-              disabled={!otpVerified || creating}
-              className="px-4 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60 sm:w-auto w-full"
-            >
-              {creating ? 'Creating…' : 'Create Account'}
-            </button>
+            {currentStep === 1 ? (
+              <div className="text-gray-600">
+                Already have an account?{' '}
+                <Link to="/login" className="font-medium text-gray-900 hover:underline">Login</Link>
+              </div>
+            ) : <span />}
+            {currentStep === 3 && (
+              <button
+                type="button"
+                onClick={handleCreateAccount}
+                disabled={!otpVerified || creating}
+                className="px-4 py-2 bg-black text-white rounded-md text-sm disabled:opacity-60 sm:w-auto w-full"
+              >
+                {creating ? 'Creating…' : 'Create Account'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Step Indicators */}
+        <div className="px-6 pb-6">
+          <div className="flex justify-center items-center gap-2">
+            {[1,2,3].map((step) => (
+              <span
+                key={step}
+                className={`inline-block rounded-full transition-all ${
+                  currentStep === step ? 'w-3 h-3 bg-gray-900' : (currentStep > step ? 'w-3 h-3 bg-gray-400' : 'w-2.5 h-2.5 bg-gray-300')
+                }`}
+                aria-label={`Step ${step} ${currentStep === step ? '(current)' : currentStep > step ? '(completed)' : ''}`}
+              />
+            ))}
+          </div>
+          <div className="mt-2 text-center text-[11px] text-gray-500">
+            {currentStep === 1 && 'Step 1: Email verification'}
+            {currentStep === 2 && 'Step 2: OTP verification'}
+            {currentStep === 3 && 'Step 3: Set password'}
           </div>
         </div>
       </div>
