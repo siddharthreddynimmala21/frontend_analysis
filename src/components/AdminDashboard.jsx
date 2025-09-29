@@ -17,6 +17,7 @@ import {
   ComposedChart,
 } from 'recharts';
 import { RefreshCw, Menu, X } from 'lucide-react';
+import Spinner from './common/Spinner';
 
 // Helper: merge interview count series with pass rate by key
 function mergeSeries(interviews, passRate) {
@@ -91,6 +92,7 @@ export default function AdminDashboard() {
   const [resumeCount, setResumeCount] = useState(null);
   const [interviewData, setInterviewData] = useState({ totalInterviews: 0, sessions: [] });
   const [interviewCounts, setInterviewCounts] = useState({}); // { [userId]: number }
+  const [interviewCountsLoading, setInterviewCountsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   // In-page tabs: 'overview' | 'users'
@@ -137,6 +139,7 @@ export default function AdminDashboard() {
           const usersList = Array.isArray(json.users) ? json.users : [];
           const toFetch = usersList.filter(u => u && u._id && typeof interviewCounts[u._id] === 'undefined');
           if (toFetch.length) {
+            setInterviewCountsLoading(true);
             const results = await Promise.allSettled(
               toFetch.map(u => fetch(`${API_BASE_URL}/api/admin/users/${u._id}/interviews`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -155,10 +158,15 @@ export default function AdminDashboard() {
             if (Object.keys(updates).length) {
               setInterviewCounts(prev => ({ ...prev, ...updates }));
             }
+            setInterviewCountsLoading(false);
+          } else {
+            // Nothing to fetch; counts (for visible users) are already known
+            setInterviewCountsLoading(false);
           }
         } catch (e) {
           // Non-fatal; keep UI responsive
           console.warn('Interview counts fetch error:', e);
+          setInterviewCountsLoading(false);
         }
       } else {
         console.error('Failed to load users', res.status, json);
@@ -408,6 +416,27 @@ export default function AdminDashboard() {
   const currentRounds = currentSession?.rounds || [];
   const currentRoundIndex = roundIndexBySession[sessionIndex] || 0;
   const currentRound = currentRounds[currentRoundIndex] || null;
+
+  // Determine if Overview tab should show an initial full-tab spinner
+  const overviewHasNoChartData =
+    !(tsSignups?.length) &&
+    !(tsInterviews?.length) &&
+    !(tsPassRate?.length) &&
+    !(distInterviewsPerUser?.length) &&
+    !(distMcqDesc?.length) &&
+    !(distRoundPass?.length);
+  const overviewInitialLoading =
+    activeTab === 'overview' && (
+      (metricsLoading && !metrics) || (chartsLoading && overviewHasNoChartData)
+    );
+
+  // Determine if "Interviews (This Page)" KPI is ready: all visible users have a known count
+  const pageInterviewCountsReady = (() => {
+    if (loading) return false;
+    const usersList = Array.isArray(data.users) ? data.users : [];
+    if (!usersList.length) return true; // no users, nothing to wait for
+    return usersList.every((u) => u && u._id && typeof interviewCounts[u._id] !== 'undefined');
+  })();
 
   const nextSession = () => {
     if (!interviewData.sessions?.length) return;
@@ -722,8 +751,15 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* Overview initial spinner */}
+          {overviewInitialLoading && (
+            <div className="min-h-[320px] flex items-center justify-center">
+              <Spinner size={28} label="Loading dashboard…" />
+            </div>
+          )}
+
           {/* KPI cards (Overview tab) */}
-          {activeTab === 'overview' && (
+          {activeTab === 'overview' && !overviewInitialLoading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {/* Total Users */}
             <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
@@ -735,35 +771,11 @@ export default function AdminDashboard() {
               <div className="text-sm text-gray-500">New Users (7d / 30d)</div>
               <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : `${metrics?.newUsers7d ?? 0} / ${metrics?.newUsers30d ?? 0}`}</div>
             </div>
-            {/* Verified Users */}
-            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
-              <div className="text-sm text-gray-500">Verified Users</div>
-              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics?.verifiedUsers ?? 0)}</div>
-            </div>
+            
             {/* Resume Uploads Total */}
             <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
               <div className="text-sm text-gray-500">Resume Uploads</div>
               <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics?.resumeUploadsTotal ?? 0)}</div>
-            </div>
-          </div>
-          )}
-
-          {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
-            {/* Total Interviews */}
-            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
-              <div className="text-sm text-gray-500">Total Interviews (All Users)</div>
-              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics?.totalInterviews ?? 0)}</div>
-            </div>
-            {/* Avg Rounds Passed / Interview */}
-            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
-              <div className="text-sm text-gray-500">Avg Rounds Passed / Interview</div>
-              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics ? (metrics.avgRoundsPassedPerInterview?.toFixed?.(2) ?? '0.00') : '—')}</div>
-            </div>
-            {/* Overall Round Pass Rate */}
-            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
-              <div className="text-sm text-gray-500">Overall Round Pass Rate</div>
-              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics ? `${Math.round((metrics.overallRoundPassRate || 0) * 100)}%` : '—')}</div>
             </div>
             {/* DAU / MAU (ratio) */}
             <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
@@ -775,12 +787,11 @@ export default function AdminDashboard() {
           </div>
           )}
 
-          {/* Secondary KPI row with page-level numbers (Overview tab) */}
-          {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {/* Interviews (This Page) */}
-            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
-              <div className="text-sm text-gray-500">Interviews (This Page)</div>
+          {activeTab === 'overview' && !overviewInitialLoading && pageInterviewCountsReady && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
+            {/* Total Interviews (All Users) — using current page sum per request */}
+            <div className="p-4 border border-gray-200 rounded-2xl bg-gray-50">
+              <div className="text-sm text-gray-500">Total Interviews (All Users)</div>
               <div className="text-2xl font-semibold text-gray-900">
                 {(() => {
                   try {
@@ -791,10 +802,29 @@ export default function AdminDashboard() {
                 })()}
               </div>
             </div>
+            {/* Avg Rounds Passed / Interview */}
+            <div className="p-4 border border-gray-200 rounded-2xl bg-gray-50">
+              <div className="text-sm text-gray-500">Avg Rounds Passed / Interview</div>
+              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics ? (metrics.avgRoundsPassedPerInterview?.toFixed?.(2) ?? '0.00') : '—')} / 4</div>
+            </div>
+            {/* Overall Round Pass Rate */}
+            <div className="p-4 border border-gray-200 rounded-2xl bg-gray-50">
+              <div className="text-sm text-gray-500">Overall Technical Rounds Pass Rate</div>
+              <div className="text-2xl font-semibold text-gray-900">{metricsLoading ? '—' : (metrics ? `${Math.round((metrics.overallRoundPassRate || 0) * 100)}%` : '—')}</div>
+            </div>
+            {/* Avg Interviews per User */}
+            <div className="p-4 border border-gray-200 rounded-2xl bg-gray-50">
+              <div className="text-sm text-gray-500">Avg Interviews per User</div>
+              <div className="text-2xl font-semibold text-gray-900">
+                {metricsLoading ? '—' : (metrics ? ((metrics.totalUsers > 0 ? (metrics.totalInterviews || 0) / (metrics.totalUsers || 1) : 0).toFixed(2)) : '—')}
+              </div>
+            </div>
           </div>
           )}
 
-          {activeTab === 'overview' && (
+          {/* Secondary KPI row removed as requested; page-level interviews moved above and renamed */}
+
+          {activeTab === 'overview' && !overviewInitialLoading && (
           <div className="space-y-6">
             <h2 className="text-base font-semibold text-gray-900">Analytics</h2>
             {/* Signups over time */}
@@ -923,7 +953,9 @@ export default function AdminDashboard() {
             {/* Users list - mobile stacked cards */}
             <div className="md:hidden space-y-2">
               {loading ? (
-                <div className="py-8 text-center text-gray-600">Loading…</div>
+                <div className="py-8 flex items-center justify-center">
+                  <Spinner label="Loading users…" />
+                </div>
               ) : data.users.length === 0 ? (
                 <div className="py-8 text-center text-gray-600 border border-dashed border-gray-300 rounded-lg">No users found</div>
               ) : (
@@ -982,7 +1014,9 @@ export default function AdminDashboard() {
               </div>
               <div className="w-full space-y-2 p-1">
                 {loading ? (
-                  <div className="py-6 text-center text-gray-600">Loading...</div>
+                  <div className="py-6 flex items-center justify-center">
+                    <Spinner label="Loading users…" />
+                  </div>
                 ) : data.users.length === 0 ? (
                   <div className="py-6 text-center text-gray-600">No users found</div>
                 ) : (
@@ -1034,16 +1068,14 @@ export default function AdminDashboard() {
                   Select a user to view details
                 </div>
               ) : (
-                <div className="w-full max-w-full">
+                <div className="w-full max-w-full relative">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-4">
                     <div className="min-w-0 max-w-full overflow-hidden">
                       <div className="text-base sm:text-lg font-semibold text-gray-900 break-all">{selectedUser.email}</div>
                       <div className="text-xs sm:text-sm text-gray-500 break-all">ID: {selectedUser._id}</div>
                     </div>
                     {detailLoading && (
-                      <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
-                        Loading...
-                      </div>
+                      <Spinner inline size={16} label="Loading details…" />
                     )}
                   </div>
 
@@ -1350,6 +1382,13 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                           )}
+                        </div>
+                      </div>
+                    )}
+                    {detailLoading && (
+                      <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
+                        <div className="bg-white border border-gray-200 rounded-2xl shadow-xl p-6">
+                          <Spinner size={32} label="Loading details…" />
                         </div>
                       </div>
                     )}

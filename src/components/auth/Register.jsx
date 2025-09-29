@@ -20,6 +20,9 @@ export default function Register() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [creating, setCreating] = useState(false);
+  // New flow tokens
+  const [tempToken, setTempToken] = useState('');
+  const [verifiedToken, setVerifiedToken] = useState('');
   const navigate = useNavigate();
   const currentStep = otpVerified ? 3 : (emailVerified ? 2 : 1);
 
@@ -31,7 +34,8 @@ export default function Register() {
         toast.error('Please enter a valid email');
         return;
       }
-      await register(emailInput);
+      const res = await register(emailInput);
+      setTempToken(res?.tempToken || '');
       setEmailVerified(true); // email accepted for signup
       toast.success('OTP sent to your email');
     } catch (err) {
@@ -51,7 +55,8 @@ export default function Register() {
         toast.error('Enter the 6-digit OTP');
         return;
       }
-      await verifyOTP(emailInput, joined);
+      const res = await verifyOTP(tempToken, joined);
+      setVerifiedToken(res?.verifiedToken || '');
       setOtpVerified(true);
       toast.success('OTP verified');
     } catch (err) {
@@ -73,7 +78,7 @@ export default function Register() {
         toast.error('Passwords do not match');
         return;
       }
-      await setupPassword(emailInput, otpInput, password);
+      await setupPassword(verifiedToken, password);
       toast.success('Account created successfully');
       navigate('/login');
     } catch (err) {
@@ -192,7 +197,18 @@ export default function Register() {
                 type="button"
                 className="text-xs text-gray-600 hover:text-gray-800"
                 disabled={!emailVerified || resending}
-                onClick={async () => { setResending(true); try { await register(emailInput); toast.success('OTP resent'); } catch (e) { toast.error('Failed to resend OTP'); } finally { setResending(false); }}}
+                onClick={async () => {
+                  setResending(true);
+                  try {
+                    const r = await register(emailInput);
+                    setTempToken(r?.tempToken || '');
+                    toast.success('OTP resent');
+                  } catch (e) {
+                    toast.error('Failed to resend OTP');
+                  } finally {
+                    setResending(false);
+                  }
+                }}
               >
                 Resend OTP
               </button>

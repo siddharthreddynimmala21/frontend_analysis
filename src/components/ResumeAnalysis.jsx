@@ -24,7 +24,7 @@ export default function ResumeAnalysis() {
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Analyzing Your Resume</h3>
         <p className="text-gray-600 dark:text-gray-300">
           This may take a few moments.<br />
-          Feel free to close the application — we'll email your personalized Resume Analysis Report shortly!
+          Feel free to explore ResumeRefiner — we'll email your personalized Resume Analysis Report shortly!
         </p>
       </div>
     </div>

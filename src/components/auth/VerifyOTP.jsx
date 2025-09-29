@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import toast from 'react-hot-toast';
-import { verifyOTP, resendOTP } from '../../services/api';
+import { verifyOTP, register } from '../../services/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { KeyRound, AlertTriangle } from 'lucide-react';
@@ -13,6 +13,8 @@ export default function VerifyOTP() {
   const location = useLocation();
   const navigate = useNavigate();
   const email = location.state?.email;
+  const initialTempToken = location.state?.tempToken || '';
+  const [tempToken, setTempToken] = useState(initialTempToken);
 
   const formik = useFormik({
     initialValues: {
@@ -26,9 +28,9 @@ export default function VerifyOTP() {
     onSubmit: async (values) => {
       try {
         setLoading(true);
-        await verifyOTP(email, values.otp);
+        const res = await verifyOTP(tempToken, values.otp);
         toast.success('OTP verified successfully!');
-        navigate('/setup-password', { state: { email, otp: values.otp } });
+        navigate('/setup-password', { state: { verifiedToken: res?.verifiedToken || '' } });
       } catch (error) {
         toast.error(error.response?.data?.message || 'OTP verification failed');
       } finally {
@@ -40,7 +42,8 @@ export default function VerifyOTP() {
   const handleResendOTP = async () => {
     try {
       setResending(true);
-      await resendOTP(email);
+      const r = await register(email);
+      setTempToken(r?.tempToken || '');
       toast.success('New OTP sent to your email');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to resend OTP');

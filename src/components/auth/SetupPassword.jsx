@@ -11,8 +11,7 @@ export default function SetupPassword() {
   const [loading, setLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const email = location.state?.email;
-  const otp = location.state?.otp;
+  const verifiedToken = location.state?.verifiedToken;
 
   const formik = useFormik({
     initialValues: {
@@ -30,7 +29,7 @@ export default function SetupPassword() {
     onSubmit: async (values) => {
       try {
         setLoading(true);
-        await setupPassword(email, otp, values.password);
+        await setupPassword(verifiedToken, values.password);
         toast.success('Password set successfully!');
         navigate('/login');
       } catch (error) {
@@ -41,7 +40,7 @@ export default function SetupPassword() {
     },
   });
 
-  if (!email || !otp) {
+  if (!verifiedToken) {
     navigate('/register');
     return null;
   }

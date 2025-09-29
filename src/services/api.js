@@ -52,17 +52,17 @@ api.interceptors.response.use(
 
 export const register = async (email) => {
   const response = await api.post('/api/auth/register', { email });
-  return response.data;
+  return response.data; // { message, email, tempToken }
 };
 
-export const verifyOTP = async (email, otp) => {
-  const response = await api.post('/api/auth/verify-otp', { email, otp });
-  return response.data;
+export const verifyOTP = async (tempToken, otp) => {
+  const response = await api.post('/api/auth/verify-otp', { tempToken, otp });
+  return response.data; // { message, verifiedToken }
 };
 
-export const setupPassword = async (email, otp, password) => {
-  const response = await api.post('/api/auth/setup-password', { email, otp, password });
-  return response.data;
+export const setupPassword = async (verifiedToken, password) => {
+  const response = await api.post('/api/auth/setup-password', { verifiedToken, password });
+  return response.data; // { message, token }
 };
 
 export const login = async (email, password) => {
@@ -70,9 +70,18 @@ export const login = async (email, password) => {
   return response.data;
 };
 
-export const resendOTP = async (email) => {
-  const response = await api.post('/api/auth/resend-otp', { email });
-  return response.data;
+export const resendOTP = async ({ tempToken, email }) => {
+  // Prefer the new flow using tempToken; fallback to email for legacy/forgot-password
+  if (tempToken) {
+    // backend uses the same /register to send new OTP; decode happens server-side
+    // but we need email; if not provided, we cannot resend
+    if (!email) throw new Error('Email required to resend OTP');
+    const response = await api.post('/api/auth/register', { email });
+    return response.data; // returns new tempToken
+  } else {
+    const response = await api.post('/api/auth/resend-otp', { email });
+    return response.data;
+  }
 };
 
 // Enhanced retry utility function
