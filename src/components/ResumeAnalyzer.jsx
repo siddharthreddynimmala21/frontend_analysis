@@ -100,7 +100,16 @@ export default function ResumeAnalyzer() {
       
       // Set the result
       setResult(response);
-      toast.success('Resume analysis completed successfully!');
+      
+      // Check email delivery status and notify user accordingly
+      if (response.emailSent) {
+        toast.success('Resume analysis completed! Report has been sent to your email.');
+      } else if (response.emailError) {
+        toast.success('Resume analysis completed!');
+        toast.error(`Email delivery failed: ${response.emailError}`, { duration: 6000 });
+      } else {
+        toast.success('Resume analysis completed successfully!');
+      }
     } catch (error) {
       console.error('Error analyzing resume:', error);
       
